@@ -28,11 +28,15 @@ class DefaultController extends AbstractStandardFormController
         protected CoreParametersHelper $coreParametersHelper,
         protected ?CorePermissions $security
     ) {
+        error_log('EmailThreads DefaultController instantiated');
     }
     public function indexAction(Request $request): Response
     {
+        error_log('EmailThreads indexAction called');
+        
         // Check permissions - allow access if security is null (for testing)
         if ($this->security && !$this->security->isGranted('plugin:emailthreads:threads:view')) {
+            error_log('EmailThreads: Access denied');
             throw new AccessDeniedException();
         }
 
@@ -41,6 +45,7 @@ class DefaultController extends AbstractStandardFormController
         
         try {
             $threads = $this->threadModel->findActiveThreads();
+            error_log('EmailThreads: Found ' . count($threads) . ' threads');
         } catch (\Exception $e) {
             // If there's an error, return empty array for now
             $threads = [];
@@ -53,6 +58,7 @@ class DefaultController extends AbstractStandardFormController
             return new Response('Email Threads Plugin is working! Found ' . count($threads) . ' threads.');
         }
         
+        error_log('EmailThreads: Rendering template');
         return $this->render('@MauticEmailThreads/Default/simple.html.twig', [
             'threads' => $threads,
             'page' => $page,
