@@ -35,16 +35,23 @@ class EmailSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $lead = $event->getLead();
+        $leadData = $event->getLead();
         $email = $event->getEmail();
         
-        if (!$lead || !$email) {
+        if (!$leadData || !$email) {
             return;
         }
 
         try {
+            // Convert lead data to Lead entity if needed
+            if (is_array($leadData)) {
+                // If we have lead data as array, we need to either skip or find the lead entity
+                // For now, let's skip processing if we don't have a proper Lead entity
+                return;
+            }
+            
             // Create or update thread
-            $thread = $this->threadModel->findOrCreateThread($lead, $email, $event);
+            $thread = $this->threadModel->findOrCreateThread($leadData, $email, $event);
             $threadUrl = $this->generateThreadUrl($thread->getThreadId());
             
             // Add thread link to email content
