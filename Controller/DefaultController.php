@@ -32,16 +32,34 @@ class DefaultController extends AbstractStandardFormController
     }
     public function indexAction(Request $request): Response
     {
-        // Enable error display for debugging
-        error_reporting(E_ALL);
-        ini_set('display_errors', 1);
-        
-        try {
-            return new Response('<h1>Email Threads Plugin Works!</h1><p>Controller is accessible. PHP errors should be visible now.</p>');
-            
-        } catch (\Throwable $e) {
-            return new Response('Error: ' . $e->getMessage() . '<br>File: ' . $e->getFile() . '<br>Line: ' . $e->getLine() . '<br>Trace: ' . $e->getTraceAsString());
+        // Check permissions - allow access if security is null (for testing)
+        if ($this->security && !$this->security->isGranted('plugin:emailthreads:threads:view')) {
+            throw new AccessDeniedException();
         }
+
+        // Get all threads with pagination
+        $page = $request->query->getInt('page', 1);
+        $limit = 20;
+        
+        $threads = $this->threadModel->getRepository()->createQueryBuilder('t')
+            ->orderBy('t.lastMessageDate', 'DESC')
+            ->setFirstResult(($page - 1) * $limit)
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+
+        $totalCount = $this->threadModel->getRepository()->createQueryBuilder('t')
+            ->select('COUNT(t.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return $this->render('@MauticEmailThreads/Default/index.html.twig', [
+            'threads' => $threads,
+            'page' => $page,
+            'limit' => $limit,
+            'totalCount' => $totalCount,
+            'totalPages' => ceil($totalCount / $limit),
+        ]);
     }
 
     public function viewAction(Request $request, int $id): Response
