@@ -64,19 +64,89 @@ class EmailThreadMessageModel
         $message->setFromName($fromName);
         $message->setDateSent(new \DateTime());
         
-        // Determine email type
+        // Enhanced email type detection for campaigns and channels
         $emailType = $this->determineEmailType($email, $event);
         $message->setEmailType($emailType);
         
-        // Set metadata
-        $metadata = [
-            'campaign_id' => $email->getCategory() ? $email->getCategory()->getId() : null,
-            'source' => $event->getSource() ?? 'unknown',
-            'tokens' => $event->getTokens() ?? [],
-        ];
+        // Enhanced metadata for campaigns, segments, and channels
+        $metadata = $this->buildMessageMetadata($email, $event);
         $message->setMetadata($metadata);
 
         $this->saveEntity($message);
+        
+        // Update thread
+        $thread->addMessage($message);
+        $thread->setLastMessageDate($message->getDateSent());
+        
+        return $message;
+    }
+
+    /**
+     * Build comprehensive metadata for campaigns, segments, and channels
+     */
+    private function buildMessageMetadata(Email $email, EmailSendEvent $event): array
+    {
+        $metadata = [
+            'source' => $event->getSource() ?? 'unknown',
+            'tokens' => $event->getTokens() ?? [],
+            'email_id' => $email->getId(),
+            'email_name' => $email->getName(),
+            'email_type' => $email->getEmailType(),
+        ];
+
+        // Campaign information
+        if ($email->getCategory()) {
+            $metadata['category_id'] = $email->getCategory()->getId();
+            $metadata['category_title'] = $email->getCategory()->getTitle();
+        }
+
+        // Campaign-specific data
+        $campaignId = $event->getIdHash()['campaignId'] ?? null;
+        if ($campaignId) {
+            $metadata['campaign_id'] = $campaignId;
+            $metadata['is_campaign_email'] = true;
+        }
+
+        // Segment/list information
+        $lists = $email->getLists();
+        if (!empty($lists)) {
+            $metadata['segments'] = [];
+            foreach ($lists as $list) {
+                $metadata['segments'][] = [
+                    'id' => $list->getId(),
+                    'name' => $list->getName(),
+                    'alias' => $list->getAlias(),
+                ];
+            }
+        }
+
+        // Channel information (for multi-channel campaigns)
+        if ($event->getSource()) {
+            $source = $event->getSource();
+            if (strpos($source, 'campaign') !== false) {
+                $metadata['channel'] = 'campaign';
+                if (strpos($source, 'trigger') !== false) {
+                    $metadata['campaign_type'] = 'triggered';
+                } else {
+                    $metadata['campaign_type'] = 'segment';
+                }
+            } elseif (strpos($source, 'broadcast') !== false) {
+                $metadata['channel'] = 'broadcast';
+            } elseif (strpos($source, 'api') !== false) {
+                $metadata['channel'] = 'api';
+            }
+        }
+
+        // Lead/contact information from event
+        $leadData = $event->getLead();
+        if (is_array($leadData)) {
+            $metadata['lead_id'] = $leadData['id'] ?? null;
+            $metadata['lead_email'] = $leadData['email'] ?? null;
+            $metadata['lead_name'] = trim(($leadData['firstname'] ?? '') . ' ' . ($leadData['lastname'] ?? ''));
+        }
+
+        return $metadata;
+    }
         
         // Update thread
         $thread->addMessage($message);
@@ -97,25 +167,63 @@ class EmailThreadMessageModel
 
     private function determineEmailType(Email $email, EmailSendEvent $event): string
     {
-        // Try to determine the email type based on various factors
+        // Enhanced email type detection
         $source = $event->getSource();
         
+        // Check source for specific patterns
         if ($source) {
+            // Campaign emails
             if (str_contains($source, 'campaign')) {
-                return 'campaign';
+                if (str_contains($source, 'trigger') || str_contains($source, 'event')) {
+                    return 'campaign_triggered';
+                } else {
+                    return 'campaign_segment';
+                }
             }
-            if (str_contains($source, 'broadcast')) {
+            
+            // Broadcast/segment emails
+            if (str_contains($source, 'broadcast') || str_contains($source, 'segment')) {
                 return 'broadcast';
             }
+            
+            // API emails
+            if (str_contains($source, 'api')) {
+                return 'api';
+            }
+            
+            // Form actions
+            if (str_contains($source, 'form')) {
+                return 'form_action';
+            }
+            
+            // Point actions
+            if (str_contains($source, 'point')) {
+                return 'point_action';
+            }
         }
         
-        // Check if it's a campaign email
-        if ($email->getEmailType() === 'list') {
-            return 'broadcast';
+        // Check email type from entity
+        $emailType = $email->getEmailType();
+        if ($emailType === 'list') {
+            return 'segment_email';
+        } elseif ($emailType === 'template') {
+            return 'template';
         }
         
-        // Default to template
-        return 'template';
+        // Check if it's part of a campaign
+        $campaignId = $event->getIdHash()['campaignId'] ?? null;
+        if ($campaignId) {
+            return 'campaign';
+        }
+        
+        // Check if it has segments/lists
+        $lists = $email->getLists();
+        if (!empty($lists)) {
+            return 'segment_email';
+        }
+        
+        // Default fallback
+        return 'direct_send';
     }
 
     protected function dispatchEvent($action, &$entity, $isNew = false, \Symfony\Component\EventDispatcher\Event $event = null)

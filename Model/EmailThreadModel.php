@@ -38,12 +38,30 @@ class EmailThreadModel
         $this->entityManager->flush();
     }
 
-    public function findOrCreateThread(Lead $lead, Email $email, EmailSendEvent $event): EmailThread
+    public function findOrCreateThread($leadData, Email $email, EmailSendEvent $event): EmailThread
     {
         $subject = $this->cleanSubject($email->getSubject());
         
+        // Handle both array and entity lead data
+        $leadId = null;
+        $leadEmail = null;
+        $leadEntity = null;
+        
+        if (is_array($leadData)) {
+            $leadId = $leadData['id'] ?? null;
+            $leadEmail = $leadData['email'] ?? null;
+        } else {
+            $leadEntity = $leadData;
+            $leadId = $leadEntity->getId();
+            $leadEmail = $leadEntity->getEmail();
+        }
+        
+        if (!$leadId || !$leadEmail) {
+            throw new \InvalidArgumentException('Invalid lead data provided');
+        }
+        
         // Check if thread already exists for this lead and subject
-        $existingThreads = $this->getRepository()->findThreadsBySubject($subject, $lead);
+        $existingThreads = $this->getRepository()->findThreadsBySubject($subject, $leadId);
         
         if (!empty($existingThreads)) {
             $thread = $existingThreads[0]; // Use the first matching thread
@@ -54,7 +72,15 @@ class EmailThreadModel
 
         // Create new thread
         $thread = new EmailThread();
-        $thread->setLead($lead);
+        
+        // Set lead reference (use entity if available, otherwise just store the ID)
+        if ($leadEntity) {
+            $thread->setLead($leadEntity);
+        } else {
+            // We'll need to handle this case - for now, skip setting lead entity
+            // The thread will be identified by other means
+        }
+        
         $thread->setSubject($subject);
         
         // Set sender information

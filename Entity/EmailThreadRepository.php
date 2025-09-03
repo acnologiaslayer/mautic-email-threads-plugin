@@ -34,14 +34,23 @@ class EmailThreadRepository extends EntityRepository
             ->getResult();
     }
 
-    public function findThreadsBySubject(string $subject, Lead $lead): array
+    public function findThreadsBySubject(string $subject, $leadIdentifier): array
     {
-        return $this->createQueryBuilder('t')
+        $queryBuilder = $this->createQueryBuilder('t')
             ->where('t.subject = :subject')
-            ->andWhere('t.lead = :lead')
-            ->setParameter('subject', $subject)
-            ->setParameter('lead', $lead)
-            ->orderBy('t.lastMessageDate', 'DESC')
+            ->setParameter('subject', $subject);
+            
+        if (is_numeric($leadIdentifier)) {
+            // Lead ID provided
+            $queryBuilder->andWhere('t.lead = :leadId')
+                ->setParameter('leadId', $leadIdentifier);
+        } else {
+            // Lead entity provided
+            $queryBuilder->andWhere('t.lead = :lead')
+                ->setParameter('lead', $leadIdentifier);
+        }
+        
+        return $queryBuilder->orderBy('t.lastMessageDate', 'DESC')
             ->getQuery()
             ->getResult();
     }
