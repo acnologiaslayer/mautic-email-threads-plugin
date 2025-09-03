@@ -1,13 +1,13 @@
 <?php
-use Mautic\EmailBundle\Event\EmailSendEvent;
-use MauticPlugin\MauticEmailThreadsBundle\Entity\EmailThreadMessage;
-use MauticPlugin\MauticEmailThreadsBundle\Model\EmailThreadMessageModel;eclare(strict_types=1);
+
+declare(strict_types=1);
 
 namespace MauticPlugin\MauticEmailThreadsBundle\EventListener;
 
 use Mautic\CoreBundle\Helper\CoreParametersHelper;
 use Mautic\EmailBundle\EmailEvents;
 use Mautic\EmailBundle\Event\EmailSendEvent;
+use MauticPlugin\MauticEmailThreadsBundle\Entity\EmailThreadMessage;
 use MauticPlugin\MauticEmailThreadsBundle\Model\EmailThreadModel;
 use MauticPlugin\MauticEmailThreadsBundle\Model\EmailThreadMessageModel;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
