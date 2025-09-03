@@ -147,13 +147,6 @@ class EmailThreadMessageModel
 
         return $metadata;
     }
-        
-        // Update thread
-        $thread->addMessage($message);
-        $thread->setLastMessageDate($message->getDateSent());
-        
-        return $message;
-    }
 
     public function getMessagesByThread(EmailThread $thread): array
     {
