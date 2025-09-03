@@ -80,22 +80,10 @@ return [
         ],
         'models' => [
             'mautic.emailthreads.model.thread' => [
-                'class'     => \MauticPlugin\MauticEmailThreadsBundle\Model\EmailThreadModel::class,
-                'arguments' => [
-                    'mautic.page.model.trackable',
-                    'mautic.helper.templating',
-                    'event_dispatcher',
-                    'mautic.lead.model.lead',
-                ],
+                'class' => \MauticPlugin\MauticEmailThreadsBundle\Model\EmailThreadModel::class,
             ],
             'mautic.emailthreads.model.message' => [
-                'class'     => \MauticPlugin\MauticEmailThreadsBundle\Model\EmailThreadMessageModel::class,
-                'arguments' => [
-                    'mautic.page.model.trackable',
-                    'mautic.helper.templating',
-                    'event_dispatcher',
-                    'mautic.lead.model.lead',
-                ],
+                'class' => \MauticPlugin\MauticEmailThreadsBundle\Model\EmailThreadMessageModel::class,
             ],
         ],
         'repositories' => [
