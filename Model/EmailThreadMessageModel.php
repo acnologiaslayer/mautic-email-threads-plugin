@@ -4,18 +4,25 @@ declare(strict_types=1);
 
 namespace MauticPlugin\MauticEmailThreadsBundle\Model;
 
-use Mautic\CoreBundle\Model\CommonModel;
+use Doctrine\ORM\EntityManagerInterface;
 use Mautic\EmailBundle\Entity\Email;
 use Mautic\EmailBundle\Entity\Stat;
 use Mautic\EmailBundle\Event\EmailSendEvent;
 use MauticPlugin\MauticEmailThreadsBundle\Entity\EmailThread;
 use MauticPlugin\MauticEmailThreadsBundle\Entity\EmailThreadMessage;
 
-class EmailThreadMessageModel extends CommonModel
+class EmailThreadMessageModel
 {
+    private EntityManagerInterface $entityManager;
+
+    public function __construct(EntityManagerInterface $entityManager)
+    {
+        $this->entityManager = $entityManager;
+    }
+
     public function getRepository()
     {
-        return $this->em->getRepository(EmailThreadMessage::class);
+        return $this->entityManager->getRepository(EmailThreadMessage::class);
     }
 
     public function getEntity($id = null): ?EmailThreadMessage
@@ -24,7 +31,13 @@ class EmailThreadMessageModel extends CommonModel
             return new EmailThreadMessage();
         }
 
-        return parent::getEntity($id);
+        return $this->getRepository()->find($id);
+    }
+
+    public function saveEntity(EmailThreadMessage $entity): void
+    {
+        $this->entityManager->persist($entity);
+        $this->entityManager->flush();
     }
 
     public function addMessageToThread(

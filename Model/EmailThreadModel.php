@@ -4,19 +4,23 @@ declare(strict_types=1);
 
 namespace MauticPlugin\MauticEmailThreadsBundle\Model;
 
-use Doctrine\ORM\EntityManager;
-use Mautic\CoreBundle\Model\CommonModel;
+use Doctrine\ORM\EntityManagerInterface;
 use Mautic\EmailBundle\Entity\Email;
 use Mautic\EmailBundle\Event\EmailSendEvent;
 use Mautic\LeadBundle\Entity\Lead;
 use MauticPlugin\MauticEmailThreadsBundle\Entity\EmailThread;
 use MauticPlugin\MauticEmailThreadsBundle\Entity\EmailThreadRepository;
 
-class EmailThreadModel extends CommonModel
+class EmailThreadModel
 {
+    public function __construct(
+        private EntityManagerInterface $entityManager
+    ) {
+    }
+
     public function getRepository(): EmailThreadRepository
     {
-        return $this->em->getRepository(EmailThread::class);
+        return $this->entityManager->getRepository(EmailThread::class);
     }
 
     public function getEntity($id = null): ?EmailThread
@@ -25,7 +29,13 @@ class EmailThreadModel extends CommonModel
             return new EmailThread();
         }
 
-        return parent::getEntity($id);
+        return $this->getRepository()->find($id);
+    }
+
+    public function saveEntity(EmailThread $entity): void
+    {
+        $this->entityManager->persist($entity);
+        $this->entityManager->flush();
     }
 
     public function findOrCreateThread(Lead $lead, Email $email, EmailSendEvent $event): EmailThread

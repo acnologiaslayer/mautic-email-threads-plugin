@@ -84,9 +84,15 @@ return [
         'models' => [
             'mautic.emailthreads.model.thread' => [
                 'class' => \MauticPlugin\MauticEmailThreadsBundle\Model\EmailThreadModel::class,
+                'arguments' => [
+                    'doctrine.orm.entity_manager',
+                ],
             ],
             'mautic.emailthreads.model.message' => [
                 'class' => \MauticPlugin\MauticEmailThreadsBundle\Model\EmailThreadMessageModel::class,
+                'arguments' => [
+                    'doctrine.orm.entity_manager',
+                ],
             ],
         ],
         'repositories' => [
