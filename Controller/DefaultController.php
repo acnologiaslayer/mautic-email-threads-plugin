@@ -43,7 +43,7 @@ class DefaultController extends AbstractStandardFormController
             $limit = 20;
             
             $threads = $this->threadModel->getRepository()->createQueryBuilder('t')
-                ->orderBy('t.firstMessageDate', 'DESC')
+                ->orderBy('t.id', 'DESC')
                 ->setFirstResult(($page - 1) * $limit)
                 ->setMaxResults($limit)
                 ->getQuery()
@@ -63,8 +63,8 @@ class DefaultController extends AbstractStandardFormController
             ]);
         } catch (\Exception $e) {
             // If tables don't exist yet, show setup message
-            if (strpos($e->getMessage(), 'email_threads') !== false || strpos($e->getMessage(), 'lastMessageDate') !== false) {
-                return new Response('<h1>Email Threads Plugin</h1><p>Database tables need to be created. Please run: <code>php bin/console doctrine:schema:update --force</code></p>');
+            if (strpos($e->getMessage(), 'email_threads') !== false || strpos($e->getMessage(), 'MessageDate') !== false) {
+                return new Response('<h1>Email Threads Plugin</h1><p>Database tables need to be created. Please run: <code>php bin/console doctrine:schema:update --force</code></p><p>Error: ' . $e->getMessage() . '</p>');
             }
             throw $e;
         }
