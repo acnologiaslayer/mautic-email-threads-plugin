@@ -34,14 +34,22 @@ class EmailSubscriber implements EventSubscriberInterface
 
     public function onEmailSend(EmailSendEvent $event): void
     {
-        if (!$this->coreParametersHelper->get('emailthreads_enabled')) {
+        // For debugging - temporarily disable the enabled check
+        $isEnabled = $this->coreParametersHelper->get('emailthreads_enabled', true); // Default to true for now
+        error_log("EmailThreads: Plugin enabled check: " . ($isEnabled ? 'true' : 'false'));
+        
+        if (!$isEnabled) {
+            error_log("EmailThreads: Plugin is disabled, skipping");
             return;
         }
 
         $leadData = $event->getLead();
         $email = $event->getEmail();
         
+        error_log("EmailThreads: Processing email send event - Email ID: " . ($email ? $email->getId() : 'null'));
+        
         if (!$leadData || !$email) {
+            error_log("EmailThreads: Missing lead data or email, skipping");
             return;
         }
 
@@ -88,6 +96,8 @@ class EmailSubscriber implements EventSubscriberInterface
                 error_log("EmailThreads: Injected thread content into email");
             } else {
                 error_log("EmailThreads: No thread content to inject (first message)");
+                // Add a simple test injection to verify the mechanism works
+                $this->injectTestContent($event);
             }
             
             // Now add the current message to the thread (after content injection)
@@ -259,6 +269,22 @@ class EmailSubscriber implements EventSubscriberInterface
 
         // Append to email content
         $event->setContent($content . $threadFooter);
+    }
+
+    /**
+     * Test method to verify email content injection works
+     */
+    private function injectTestContent(EmailSendEvent $event): void
+    {
+        $content = $event->getContent();
+        if (!$content) {
+            return;
+        }
+
+        $testFooter = '<div style="background: #ffeb3b; padding: 10px; margin-top: 20px; border-radius: 5px;"><strong>🧪 EmailThreads Plugin Active</strong> - This message shows the plugin is working. Quoted messages will appear here after the first email.</div>';
+        
+        $event->setContent($content . $testFooter);
+        error_log("EmailThreads: Added test content to verify injection mechanism");
     }
 
     /**

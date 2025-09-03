@@ -151,12 +151,17 @@ class EmailThreadMessageModel
     public function getMessagesByThread(EmailThread $thread): array
     {
         try {
-            return $this->getRepository()->createQueryBuilder('m')
+            // First try the Doctrine approach
+            $messages = $this->getRepository()->createQueryBuilder('m')
                 ->where('m.thread = :thread')
                 ->setParameter('thread', $thread)
                 ->orderBy('m.dateSent', 'ASC')
                 ->getQuery()
                 ->getResult();
+                
+            error_log("EmailThreads: Found " . count($messages) . " messages via Doctrine for thread " . $thread->getId());
+            return $messages;
+            
         } catch (\Exception $e) {
             // If Doctrine queries fail, try raw SQL approach
             error_log("EmailThreads: Doctrine query failed, trying raw SQL: " . $e->getMessage());
