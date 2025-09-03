@@ -15,12 +15,24 @@ use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 class EmailSubscriber implements EventSubscriberInterface
 {
+    private $threadModel;
+    private $messageModel;
+    private $coreParametersHelper;
+    private $router;
+
     public function __construct(
-        private EmailThreadModel $threadModel,
-        private EmailThreadMessageModel $messageModel,
-        private CoreParametersHelper $coreParametersHelper,
-        private UrlGeneratorInterface $router
+        $threadModel = null,
+        $messageModel = null,
+        $coreParametersHelper = null,
+        $router = null
     ) {
+        $this->threadModel = $threadModel;
+        $this->messageModel = $messageModel;
+        $this->coreParametersHelper = $coreParametersHelper;
+        $this->router = $router;
+        
+        // Log constructor call
+        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - EmailSubscriber constructor called\n", FILE_APPEND);
     }
 
     public static function getSubscribedEvents(): array
@@ -29,17 +41,33 @@ class EmailSubscriber implements EventSubscriberInterface
             EmailEvents::EMAIL_ON_SEND     => ['onEmailSend', 0],
             EmailEvents::EMAIL_ON_DISPLAY  => ['onEmailDisplay', 0],
             EmailEvents::EMAIL_PRE_SEND    => ['onEmailPreSend', 0],
+            // Add more email events to catch all possibilities
+            'mautic.email_on_send'         => ['onEmailSend', 0],
+            'mautic.email_pre_send'        => ['onEmailPreSend', 0],
         ];
     }
 
     public function onEmailSend(EmailSendEvent $event): void
     {
+        // Simple file logging to verify the event is triggered
+        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - EmailSubscriber::onEmailSend called\n", FILE_APPEND);
+        
+        // Always inject test content to verify the plugin is working
+        $this->injectSimpleTestContent($event);
+        
+        // Check if services are available
+        if (!$this->threadModel || !$this->messageModel) {
+            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Missing required services, skipping\n", FILE_APPEND);
+            return;
+        }
+        
         // For debugging - temporarily disable the enabled check
-        $isEnabled = $this->coreParametersHelper->get('emailthreads_enabled', true); // Default to true for now
+        $isEnabled = $this->coreParametersHelper ? $this->coreParametersHelper->get('emailthreads_enabled', true) : true;
         error_log("EmailThreads: Plugin enabled check: " . ($isEnabled ? 'true' : 'false'));
         
         if (!$isEnabled) {
             error_log("EmailThreads: Plugin is disabled, skipping");
+            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Plugin disabled, skipping\n", FILE_APPEND);
             return;
         }
 
@@ -47,13 +75,19 @@ class EmailSubscriber implements EventSubscriberInterface
         $email = $event->getEmail();
         
         error_log("EmailThreads: Processing email send event - Email ID: " . ($email ? $email->getId() : 'null'));
+        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Processing email ID: " . ($email ? $email->getId() : 'null') . "\n", FILE_APPEND);
         
         if (!$leadData || !$email) {
             error_log("EmailThreads: Missing lead data or email, skipping");
+            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Missing lead data or email, skipping\n", FILE_APPEND);
             return;
         }
 
         try {
+            // Always inject test content to verify the plugin is working
+            $this->injectTestContent($event);
+            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Test content injected\n", FILE_APPEND);
+            
             // Handle both array and entity lead data
             $leadEntity = null;
             $leadId = null;
@@ -292,6 +326,7 @@ class EmailSubscriber implements EventSubscriberInterface
      */
     public function onEmailDisplay($event): void
     {
+        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - EmailSubscriber::onEmailDisplay called\n", FILE_APPEND);
         // This can be used to track email opens in threads
         // Implementation can be added later if needed
     }
@@ -301,16 +336,42 @@ class EmailSubscriber implements EventSubscriberInterface
      */
     public function onEmailPreSend($event): void
     {
+        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - EmailSubscriber::onEmailPreSend called\n", FILE_APPEND);
         // This can be used for additional pre-processing
         // Implementation can be added later if needed
     }
 
+    /**
+     * Simple test method to verify email content injection works at the most basic level
+     */
+    private function injectSimpleTestContent(EmailSendEvent $event): void
+    {
+        try {
+            $content = $event->getContent();
+            if ($content) {
+                $testFooter = '<div style="background: #ff5722; color: white; padding: 10px; margin-top: 20px; border-radius: 5px; text-align: center;"><strong>🔥 EMAILTHREADS PLUGIN IS ACTIVE</strong><br>This proves the event listener is working!</div>';
+                $event->setContent($content . $testFooter);
+                file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Simple test content injected successfully\n", FILE_APPEND);
+            }
+        } catch (\Exception $e) {
+            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Error injecting test content: " . $e->getMessage() . "\n", FILE_APPEND);
+        }
+    }
+
     private function generateThreadUrl(string $threadId): string
     {
-        return $this->router->generate(
-            'mautic_emailthreads_public',
-            ['threadId' => $threadId],
-            UrlGeneratorInterface::ABSOLUTE_URL
-        );
+        if (!$this->router) {
+            return '/email-thread/' . $threadId; // Fallback URL
+        }
+        
+        try {
+            return $this->router->generate(
+                'mautic_emailthreads_public',
+                ['threadId' => $threadId],
+                UrlGeneratorInterface::ABSOLUTE_URL
+            );
+        } catch (\Exception $e) {
+            return '/email-thread/' . $threadId; // Fallback URL
+        }
     }
 }
