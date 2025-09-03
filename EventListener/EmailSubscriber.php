@@ -1,6 +1,7 @@
 <?php
-
-declare(strict_types=1);
+use Mautic\EmailBundle\Event\EmailSendEvent;
+use MauticPlugin\MauticEmailThreadsBundle\Entity\EmailThreadMessage;
+use MauticPlugin\MauticEmailThreadsBundle\Model\EmailThreadMessageModel;eclare(strict_types=1);
 
 namespace MauticPlugin\MauticEmailThreadsBundle\EventListener;
 
@@ -66,14 +67,28 @@ class EmailSubscriber implements EventSubscriberInterface
             // Create or update thread - pass lead data that we have
             $thread = $this->threadModel->findOrCreateThread($leadData, $email, $event);
             
+            // Debug logging
+            error_log("EmailThreads: Thread ID: " . $thread->getThreadId() . ", Lead ID: " . $leadId);
+            
             // First, get existing messages for thread content generation
             $existingMessages = $this->messageModel->getMessagesByThread($thread);
+            
+            // Debug logging
+            error_log("EmailThreads: Found " . count($existingMessages) . " existing messages");
             
             // Generate thread content with quoted previous messages (before adding current message)
             $threadContent = $this->generateThreadContentWithPrevious($existingMessages, $email, $event);
             
+            // Debug logging
+            error_log("EmailThreads: Generated thread content length: " . strlen($threadContent));
+            
             // Update email content with threaded conversation BEFORE adding to thread
-            $this->injectThreadContent($event, $threadContent, $thread);
+            if (!empty($threadContent)) {
+                $this->injectThreadContent($event, $threadContent, $thread);
+                error_log("EmailThreads: Injected thread content into email");
+            } else {
+                error_log("EmailThreads: No thread content to inject (first message)");
+            }
             
             // Now add the current message to the thread (after content injection)
             $message = $this->messageModel->addMessageToThread($thread, $email, null, $event);
@@ -101,11 +116,20 @@ class EmailSubscriber implements EventSubscriberInterface
         $maxMessages = 3; // Limit to last 3 messages to avoid clutter
         
         foreach (array_slice($reversedMessages, 0, $maxMessages) as $index => $message) {
-            $messageDate = $message->getDateSent()->format('M j, Y \a\t g:i A');
-            $fromName = $message->getFromName() ?: $message->getFromEmail();
+            // Handle both entity objects and stdClass objects
+            $messageDate = ($message instanceof EmailThreadMessage) 
+                ? $message->getDateSent()->format('M j, Y \a\t g:i A')
+                : $message->dateSent->format('M j, Y \a\t g:i A');
+                
+            $fromName = ($message instanceof EmailThreadMessage)
+                ? ($message->getFromName() ?: $message->getFromEmail())
+                : ($message->fromName ?: $message->fromEmail);
+                
+            $content = ($message instanceof EmailThreadMessage)
+                ? $message->getContent()
+                : $message->content;
             
             // Get and clean the content
-            $content = $message->getContent();
             $quotedContent = $this->quoteMessageContent($content);
             
             $threadHtml .= sprintf(

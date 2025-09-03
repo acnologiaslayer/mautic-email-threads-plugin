@@ -150,12 +150,49 @@ class EmailThreadMessageModel
 
     public function getMessagesByThread(EmailThread $thread): array
     {
-        return $this->getRepository()->createQueryBuilder('m')
-            ->where('m.thread = :thread')
-            ->setParameter('thread', $thread)
-            ->orderBy('m.dateSent', 'ASC')
-            ->getQuery()
-            ->getResult();
+        try {
+            return $this->getRepository()->createQueryBuilder('m')
+                ->where('m.thread = :thread')
+                ->setParameter('thread', $thread)
+                ->orderBy('m.dateSent', 'ASC')
+                ->getQuery()
+                ->getResult();
+        } catch (\Exception $e) {
+            // If Doctrine queries fail, try raw SQL approach
+            error_log("EmailThreads: Doctrine query failed, trying raw SQL: " . $e->getMessage());
+            return $this->getMessagesByThreadRaw($thread->getId());
+        }
+    }
+
+    /**
+     * Get messages using raw SQL as fallback
+     */
+    private function getMessagesByThreadRaw(int $threadId): array
+    {
+        try {
+            $connection = $this->entityManager->getConnection();
+            $sql = 'SELECT * FROM email_thread_messages WHERE thread_id = ? ORDER BY date_sent ASC';
+            $result = $connection->executeQuery($sql, [$threadId]);
+            
+            $messages = [];
+            while ($row = $result->fetchAssociative()) {
+                // Create simple objects with the data we need
+                $message = new \stdClass();
+                $message->id = $row['id'];
+                $message->subject = $row['subject'];
+                $message->content = $row['content'];
+                $message->fromEmail = $row['from_email'];
+                $message->fromName = $row['from_name'];
+                $message->dateSent = new \DateTime($row['date_sent']);
+                $message->emailType = $row['email_type'];
+                $messages[] = $message;
+            }
+            
+            return $messages;
+        } catch (\Exception $e) {
+            error_log("EmailThreads: Raw SQL query also failed: " . $e->getMessage());
+            return [];
+        }
     }
 
     private function determineEmailType(Email $email, EmailSendEvent $event): string
