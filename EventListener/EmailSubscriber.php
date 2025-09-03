@@ -84,10 +84,6 @@ class EmailSubscriber implements EventSubscriberInterface
         }
 
         try {
-            // Always inject test content to verify the plugin is working
-            $this->injectTestContent($event);
-            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Test content injected\n", FILE_APPEND);
-            
             // Handle both array and entity lead data
             $leadEntity = null;
             $leadId = null;
@@ -111,31 +107,31 @@ class EmailSubscriber implements EventSubscriberInterface
             
             // Debug logging
             error_log("EmailThreads: Thread ID: " . $thread->getThreadId() . ", Lead ID: " . $leadId);
+            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Created/found thread: " . $thread->getThreadId() . " for lead: " . $leadId . "\n", FILE_APPEND);
             
-            // First, get existing messages for thread content generation
-            $existingMessages = $this->messageModel->getMessagesByThread($thread);
+            // First add the current message to get all thread messages
+            $currentMessage = $this->messageModel->addMessageToThread($thread, $email, null, $event);
+            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Added current message to thread\n", FILE_APPEND);
             
-            // Debug logging
-            error_log("EmailThreads: Found " . count($existingMessages) . " existing messages");
+            // Now inject quoted content from previous messages
+            $allMessages = $this->messageModel->getMessagesByThread($thread);
+            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Total messages in thread now: " . count($allMessages) . "\n", FILE_APPEND);
             
-            // Generate thread content with quoted previous messages (before adding current message)
-            $threadContent = $this->generateThreadContentWithPrevious($existingMessages, $email, $event);
+            // Generate thread content with quoted previous messages (exclude current message)
+            $previousMessages = array_slice($allMessages, 0, -1); // All except the last (current) message
+            $threadContent = $this->generateThreadContentWithPrevious($previousMessages, $email, $event);
             
             // Debug logging
             error_log("EmailThreads: Generated thread content length: " . strlen($threadContent));
+            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Generated thread content length: " . strlen($threadContent) . "\n", FILE_APPEND);
             
-            // Update email content with threaded conversation BEFORE adding to thread
+            // Update email content with threaded conversation
             if (!empty($threadContent)) {
                 $this->injectThreadContent($event, $threadContent, $thread);
                 error_log("EmailThreads: Injected thread content into email");
             } else {
                 error_log("EmailThreads: No thread content to inject (first message)");
-                // Add a simple test injection to verify the mechanism works
-                $this->injectTestContent($event);
             }
-            
-            // Now add the current message to the thread (after content injection)
-            $message = $this->messageModel->addMessageToThread($thread, $email, null, $event);
             
         } catch (\Exception $e) {
             // Log error but don't break email sending
