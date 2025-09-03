@@ -18,7 +18,7 @@ class DefaultController extends AbstractStandardFormController
 {
     public function __construct(
         private EmailThreadModel $threadModel,
-        private CoreParametersHelper $coreParametersHelper,
+        protected CoreParametersHelper $coreParametersHelper,
         private CorePermissions $security
     ) {
     }

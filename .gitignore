@@ -41,3 +41,4 @@ logs/
 # Compiled assets
 *.min.css
 *.min.js
+.github
