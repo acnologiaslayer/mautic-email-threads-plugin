@@ -19,13 +19,13 @@ class DefaultController extends AbstractStandardFormController
     public function __construct(
         private EmailThreadModel $threadModel,
         protected CoreParametersHelper $coreParametersHelper,
-        protected CorePermissions $security
+        protected ?CorePermissions $security
     ) {
     }
     public function indexAction(Request $request): Response
     {
         // Check permissions
-        if (!$this->security->isGranted('plugin:emailthreads:threads:view')) {
+        if (!$this->security?->isGranted('plugin:emailthreads:threads:view')) {
             throw new AccessDeniedException();
         }
 
@@ -44,7 +44,7 @@ class DefaultController extends AbstractStandardFormController
     public function viewAction(Request $request, int $id): Response
     {
         // Check permissions
-        if (!$this->security->isGranted('plugin:emailthreads:threads:view')) {
+        if (!$this->security?->isGranted('plugin:emailthreads:threads:view')) {
             throw new AccessDeniedException();
         }
 
@@ -62,7 +62,7 @@ class DefaultController extends AbstractStandardFormController
     public function configAction(Request $request): Response
     {
         // Check permissions
-        if (!$this->security->isGranted('plugin:emailthreads:config:manage')) {
+        if (!$this->security?->isGranted('plugin:emailthreads:config:manage')) {
             throw new AccessDeniedException();
         }
 
@@ -97,7 +97,7 @@ class DefaultController extends AbstractStandardFormController
     public function cleanupAction(Request $request): JsonResponse
     {
         // Check permissions
-        if (!$this->security->isGranted('plugin:emailthreads:config:manage')) {
+        if (!$this->security?->isGranted('plugin:emailthreads:config:manage')) {
             return new JsonResponse(['success' => false, 'message' => 'Access denied'], 403);
         }
 
