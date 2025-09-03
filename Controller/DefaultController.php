@@ -32,38 +32,16 @@ class DefaultController extends AbstractStandardFormController
     }
     public function indexAction(Request $request): Response
     {
-        error_log('EmailThreads indexAction called');
-        
-        // Check permissions - allow access if security is null (for testing)
-        if ($this->security && !$this->security->isGranted('plugin:emailthreads:threads:view')) {
-            error_log('EmailThreads: Access denied');
-            throw new AccessDeniedException();
-        }
-
-        $page = $request->query->getInt('page', 1);
-        $limit = $request->query->getInt('limit', 30);
-        
         try {
-            $threads = $this->threadModel->findActiveThreads();
-            error_log('EmailThreads: Found ' . count($threads) . ' threads');
+            error_log('EmailThreads indexAction called');
+            
+            // Simple test - just return a basic response
+            return new Response('<h1>Email Threads Plugin Works!</h1><p>Controller is accessible.</p>');
+            
         } catch (\Exception $e) {
-            // If there's an error, return empty array for now
-            $threads = [];
-            // Add debugging info
-            error_log('Email Threads Plugin Error: ' . $e->getMessage());
+            error_log('EmailThreads Error: ' . $e->getMessage());
+            return new Response('Error: ' . $e->getMessage());
         }
-        
-        // For debugging - let's return a simple response first
-        if ($request->query->get('debug')) {
-            return new Response('Email Threads Plugin is working! Found ' . count($threads) . ' threads.');
-        }
-        
-        error_log('EmailThreads: Rendering template');
-        return $this->render('@MauticEmailThreads/Default/simple.html.twig', [
-            'threads' => $threads,
-            'page' => $page,
-            'limit' => $limit,
-        ]);
     }
 
     public function viewAction(Request $request, int $id): Response
