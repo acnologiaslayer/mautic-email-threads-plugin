@@ -24,6 +24,10 @@ return [
                 'path'       => '/emailthreads/config',
                 'controller' => 'MauticPlugin\MauticEmailThreadsBundle\Controller\DefaultController::configAction',
             ],
+            'mautic_emailthreads_cleanup' => [
+                'path'       => '/emailthreads/cleanup',
+                'controller' => 'MauticPlugin\MauticEmailThreadsBundle\Controller\DefaultController::cleanupAction',
+            ],
         ],
         'public' => [
             'mautic_emailthreads_public' => [

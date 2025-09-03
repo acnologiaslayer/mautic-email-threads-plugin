@@ -44,6 +44,13 @@ class DefaultController extends AbstractStandardFormController
         } catch (\Exception $e) {
             // If there's an error, return empty array for now
             $threads = [];
+            // Add debugging info
+            error_log('Email Threads Plugin Error: ' . $e->getMessage());
+        }
+        
+        // For debugging - let's return a simple response first
+        if ($request->query->get('debug')) {
+            return new Response('Email Threads Plugin is working! Found ' . count($threads) . ' threads.');
         }
         
         return $this->render('@MauticEmailThreads/Default/index.html.twig', [
