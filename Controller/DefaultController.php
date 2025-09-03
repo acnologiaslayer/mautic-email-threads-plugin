@@ -37,29 +37,37 @@ class DefaultController extends AbstractStandardFormController
             throw new AccessDeniedException();
         }
 
-        // Get all threads with pagination
-        $page = $request->query->getInt('page', 1);
-        $limit = 20;
-        
-        $threads = $this->threadModel->getRepository()->createQueryBuilder('t')
-            ->orderBy('t.lastMessageDate', 'DESC')
-            ->setFirstResult(($page - 1) * $limit)
-            ->setMaxResults($limit)
-            ->getQuery()
-            ->getResult();
+        try {
+            // Get all threads with pagination
+            $page = $request->query->getInt('page', 1);
+            $limit = 20;
+            
+            $threads = $this->threadModel->getRepository()->createQueryBuilder('t')
+                ->orderBy('t.firstMessageDate', 'DESC')
+                ->setFirstResult(($page - 1) * $limit)
+                ->setMaxResults($limit)
+                ->getQuery()
+                ->getResult();
 
-        $totalCount = $this->threadModel->getRepository()->createQueryBuilder('t')
-            ->select('COUNT(t.id)')
-            ->getQuery()
-            ->getSingleScalarResult();
+            $totalCount = $this->threadModel->getRepository()->createQueryBuilder('t')
+                ->select('COUNT(t.id)')
+                ->getQuery()
+                ->getSingleScalarResult();
 
-        return $this->render('@MauticEmailThreads/Default/index.html.twig', [
-            'threads' => $threads,
-            'page' => $page,
-            'limit' => $limit,
-            'totalCount' => $totalCount,
-            'totalPages' => ceil($totalCount / $limit),
-        ]);
+            return $this->render('@MauticEmailThreads/Default/index.html.twig', [
+                'threads' => $threads,
+                'page' => $page,
+                'limit' => $limit,
+                'totalCount' => $totalCount,
+                'totalPages' => ceil($totalCount / $limit),
+            ]);
+        } catch (\Exception $e) {
+            // If tables don't exist yet, show setup message
+            if (strpos($e->getMessage(), 'email_threads') !== false || strpos($e->getMessage(), 'lastMessageDate') !== false) {
+                return new Response('<h1>Email Threads Plugin</h1><p>Database tables need to be created. Please run: <code>php bin/console doctrine:schema:update --force</code></p>');
+            }
+            throw $e;
+        }
     }
 
     public function viewAction(Request $request, int $id): Response
