@@ -52,7 +52,6 @@ return [
     ],
     
     'services' => [
-    'services' => [
         'events' => [
             'mautic.emailthreads.subscriber.email' => [
                 'class'     => \MauticPlugin\MauticEmailThreadsBundle\EventListener\EmailSubscriber::class,
