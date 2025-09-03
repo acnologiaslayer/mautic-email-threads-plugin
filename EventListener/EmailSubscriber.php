@@ -66,19 +66,70 @@ class EmailSubscriber implements EventSubscriberInterface
             // Create or update thread - pass lead data that we have
             $thread = $this->threadModel->findOrCreateThread($leadData, $email, $event);
             
-            // Add the message to the thread with proper threading
-            $message = $this->messageModel->addMessageToThread($thread, $email, null, $event);
+            // First, get existing messages for thread content generation
+            $existingMessages = $this->messageModel->getMessagesByThread($thread);
             
-            // Generate thread content with quoted previous messages
-            $threadContent = $this->generateThreadContent($thread, $message);
+            // Generate thread content with quoted previous messages (before adding current message)
+            $threadContent = $this->generateThreadContentWithPrevious($existingMessages, $email, $event);
             
-            // Update email content with threaded conversation
+            // Update email content with threaded conversation BEFORE adding to thread
             $this->injectThreadContent($event, $threadContent, $thread);
+            
+            // Now add the current message to the thread (after content injection)
+            $message = $this->messageModel->addMessageToThread($thread, $email, null, $event);
             
         } catch (\Exception $e) {
             // Log error but don't break email sending
             error_log('EmailThreads error: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Generate Gmail/Outlook style threaded content showing only previous messages
+     */
+    private function generateThreadContentWithPrevious(array $previousMessages, $currentEmail, $event): string
+    {
+        if (empty($previousMessages)) {
+            return ''; // No previous messages to show
+        }
+        
+        $threadHtml = '<div class="email-thread-history" style="margin-top: 20px; border-top: 1px solid #ddd; padding-top: 15px;">';
+        $threadHtml .= '<h4 style="margin: 0 0 15px 0; font-size: 14px; color: #666;">Previous Messages:</h4>';
+        
+        // Show previous messages in reverse order (most recent first)
+        $reversedMessages = array_reverse($previousMessages);
+        $maxMessages = 3; // Limit to last 3 messages to avoid clutter
+        
+        foreach (array_slice($reversedMessages, 0, $maxMessages) as $index => $message) {
+            $messageDate = $message->getDateSent()->format('M j, Y \a\t g:i A');
+            $fromName = $message->getFromName() ?: $message->getFromEmail();
+            
+            // Get and clean the content
+            $content = $message->getContent();
+            $quotedContent = $this->quoteMessageContent($content);
+            
+            $threadHtml .= sprintf(
+                '<div class="previous-message" style="margin: 15px 0; border-left: 3px solid #007bff; padding-left: 15px; background: #f8f9fa; padding: 10px 10px 10px 15px;">
+                    <div class="message-header" style="font-size: 12px; color: #666; margin-bottom: 8px; font-weight: bold;">
+                        On %s, %s wrote:
+                    </div>
+                    <div class="quoted-content" style="font-size: 13px; color: #555; font-style: italic;">
+                        %s
+                    </div>
+                </div>',
+                $messageDate,
+                htmlspecialchars($fromName),
+                $quotedContent
+            );
+        }
+        
+        if (count($previousMessages) > $maxMessages) {
+            $threadHtml .= '<div style="font-size: 12px; color: #999; text-align: center; margin: 10px 0;">... and ' . (count($previousMessages) - $maxMessages) . ' earlier messages</div>';
+        }
+        
+        $threadHtml .= '</div>';
+        
+        return $threadHtml;
     }
 
     /**
@@ -126,22 +177,32 @@ class EmailSubscriber implements EventSubscriberInterface
      */
     private function quoteMessageContent(string $content): string
     {
-        // Remove HTML tags for cleaner quoting
-        $textContent = strip_tags($content);
+        // Convert HTML to text with better formatting
+        $textContent = html_entity_decode(strip_tags($content));
         
-        // Split into lines and add > prefix
-        $lines = explode("\n", $textContent);
-        $quotedLines = array_map(function($line) {
-            return '> ' . trim($line);
-        }, $lines);
+        // Remove extra whitespace and normalize line breaks
+        $textContent = preg_replace('/\s+/', ' ', $textContent);
+        $textContent = trim($textContent);
         
-        // Limit to first 5 lines to avoid very long quotes
-        if (count($quotedLines) > 5) {
-            $quotedLines = array_slice($quotedLines, 0, 5);
-            $quotedLines[] = '> [... message truncated ...]';
+        // Break into sentences for better readability
+        $sentences = preg_split('/(?<=[.!?])\s+/', $textContent);
+        
+        // Limit to first 2-3 sentences to keep quotes concise
+        $maxSentences = 3;
+        if (count($sentences) > $maxSentences) {
+            $sentences = array_slice($sentences, 0, $maxSentences);
+            $textContent = implode(' ', $sentences) . '...';
+        } else {
+            $textContent = implode(' ', $sentences);
         }
         
-        return implode("<br>", $quotedLines);
+        // Limit overall length
+        if (strlen($textContent) > 200) {
+            $textContent = substr($textContent, 0, 200) . '...';
+        }
+        
+        // Add quote styling
+        return '<em style="color: #666;">"' . htmlspecialchars($textContent) . '"</em>';
     }
 
     /**
@@ -150,23 +211,23 @@ class EmailSubscriber implements EventSubscriberInterface
     private function injectThreadContent(EmailSendEvent $event, string $threadContent, $thread): void
     {
         $content = $event->getContent();
-        if (!$content) {
-            return;
+        if (!$content || empty($threadContent)) {
+            return; // No content or no thread history to add
         }
 
         // Generate thread URL
         $threadUrl = $this->generateThreadUrl($thread->getThreadId());
         
-        // Create thread footer with conversation history
+        // Create thread footer with conversation history only if there's actual thread content
         $threadFooter = sprintf(
-            '<div class="email-thread-container" style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
-                <div class="thread-header" style="margin-bottom: 15px;">
-                    <h3 style="margin: 0; font-size: 16px; color: #333;">Conversation History</h3>
-                    <p style="margin: 5px 0 0 0; font-size: 12px; color: #666;">
-                        <a href="%s" style="color: #007bff; text-decoration: none;">View complete conversation online</a>
+            '<div class="email-thread-container" style="margin-top: 20px; border-top: 2px solid #007bff; padding-top: 15px; background: #f8f9fa; padding: 15px; border-radius: 5px;">
+                <div class="thread-header" style="margin-bottom: 10px;">
+                    <h4 style="margin: 0; font-size: 14px; color: #007bff;">📧 Email Thread</h4>
+                    <p style="margin: 3px 0 0 0; font-size: 11px; color: #666;">
+                        <a href="%s" style="color: #007bff; text-decoration: none;">🔗 View full conversation online</a>
                     </p>
                 </div>
-                <div class="thread-content">%s</div>
+                %s
             </div>',
             $threadUrl,
             $threadContent
