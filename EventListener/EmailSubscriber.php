@@ -26,7 +26,6 @@ class EmailSubscriber implements EventSubscriberInterface
     {
         return [
             EmailEvents::EMAIL_ON_SEND     => ['onEmailSend', 0],
-            EmailEvents::EMAIL_POST_SEND   => ['onEmailPostSend', 0],
         ];
     }
 
@@ -43,14 +42,14 @@ class EmailSubscriber implements EventSubscriberInterface
             return;
         }
 
-        // Add thread tracking to email content
-        $content = $event->getContent();
-        if ($content) {
-            try {
-                $threadId = $this->getOrCreateThreadId($lead, $email, $event);
-                $threadUrl = $this->generateThreadUrl($threadId);
-                
-                // Add thread link to email content
+        try {
+            // Create or update thread
+            $thread = $this->threadModel->findOrCreateThread($lead, $email, $event);
+            $threadUrl = $this->generateThreadUrl($thread->getThreadId());
+            
+            // Add thread link to email content
+            $content = $event->getContent();
+            if ($content) {
                 $threadLink = sprintf(
                     '<div style="margin: 20px 0; padding: 10px; background: #f8f9fa; border-left: 4px solid #007bff; font-size: 12px;">
                         <p style="margin: 0; color: #6c757d;">
@@ -62,44 +61,16 @@ class EmailSubscriber implements EventSubscriberInterface
                 
                 $modifiedContent = $content . $threadLink;
                 $event->setContent($modifiedContent);
-            } catch (\Exception $e) {
-                // Log error but don't break email sending
-                error_log('Email Threads Plugin Error during send: ' . $e->getMessage());
             }
-        }
-    }
-
-    public function onEmailPostSend(EmailSendEvent $event): void
-    {
-        if (!$this->coreParametersHelper->get('emailthreads_enabled')) {
-            return;
-        }
-
-        $lead = $event->getLead();
-        $email = $event->getEmail();
-        $emailStat = $event->getStat();
-        
-        if (!$lead || !$email) {
-            return;
-        }
-
-        try {
-            // Create or update thread
-            $thread = $this->threadModel->findOrCreateThread($lead, $email, $event);
             
             // Add message to thread
+            $emailStat = $event->getStat();
             $this->messageModel->addMessageToThread($thread, $email, $emailStat, $event);
             
         } catch (\Exception $e) {
             // Log error but don't break email sending
-            error_log('Email Threads Plugin Error during post-send: ' . $e->getMessage());
+            error_log('Email Threads Plugin Error during send: ' . $e->getMessage());
         }
-    }
-
-    private function getOrCreateThreadId($lead, $email, EmailSendEvent $event): string
-    {
-        $thread = $this->threadModel->findOrCreateThread($lead, $email, $event);
-        return $thread->getThreadId();
     }
 
     private function generateThreadUrl(string $threadId): string
