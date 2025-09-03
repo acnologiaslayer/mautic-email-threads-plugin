@@ -53,7 +53,7 @@ class DefaultController extends AbstractStandardFormController
             return new Response('Email Threads Plugin is working! Found ' . count($threads) . ' threads.');
         }
         
-        return $this->render('@MauticEmailThreads/Default/index.html.twig', [
+        return $this->render('@MauticEmailThreads/Default/simple.html.twig', [
             'threads' => $threads,
             'page' => $page,
             'limit' => $limit,
