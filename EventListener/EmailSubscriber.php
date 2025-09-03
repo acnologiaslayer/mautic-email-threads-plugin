@@ -52,9 +52,6 @@ class EmailSubscriber implements EventSubscriberInterface
         // Simple file logging to verify the event is triggered
         file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - EmailSubscriber::onEmailSend called\n", FILE_APPEND);
         
-        // Always inject test content to verify the plugin is working
-        $this->injectSimpleTestContent($event);
-        
         // Check if services are available
         if (!$this->threadModel || !$this->messageModel) {
             file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Missing required services, skipping\n", FILE_APPEND);
@@ -302,22 +299,6 @@ class EmailSubscriber implements EventSubscriberInterface
     }
 
     /**
-     * Test method to verify email content injection works
-     */
-    private function injectTestContent(EmailSendEvent $event): void
-    {
-        $content = $event->getContent();
-        if (!$content) {
-            return;
-        }
-
-        $testFooter = '<div style="background: #ffeb3b; padding: 10px; margin-top: 20px; border-radius: 5px;"><strong>🧪 EmailThreads Plugin Active</strong> - This message shows the plugin is working. Quoted messages will appear here after the first email.</div>';
-        
-        $event->setContent($content . $testFooter);
-        error_log("EmailThreads: Added test content to verify injection mechanism");
-    }
-
-    /**
      * Handle email display events (for tracking when emails are viewed)
      */
     public function onEmailDisplay($event): void
@@ -335,23 +316,6 @@ class EmailSubscriber implements EventSubscriberInterface
         file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - EmailSubscriber::onEmailPreSend called\n", FILE_APPEND);
         // This can be used for additional pre-processing
         // Implementation can be added later if needed
-    }
-
-    /**
-     * Simple test method to verify email content injection works at the most basic level
-     */
-    private function injectSimpleTestContent(EmailSendEvent $event): void
-    {
-        try {
-            $content = $event->getContent();
-            if ($content) {
-                $testFooter = '<div style="background: #ff5722; color: white; padding: 10px; margin-top: 20px; border-radius: 5px; text-align: center;"><strong>🔥 EMAILTHREADS PLUGIN IS ACTIVE</strong><br>This proves the event listener is working!</div>';
-                $event->setContent($content . $testFooter);
-                file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Simple test content injected successfully\n", FILE_APPEND);
-            }
-        } catch (\Exception $e) {
-            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Error injecting test content: " . $e->getMessage() . "\n", FILE_APPEND);
-        }
     }
 
     private function generateThreadUrl(string $threadId): string
