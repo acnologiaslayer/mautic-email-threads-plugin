@@ -16,6 +16,13 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 class DefaultController extends AbstractStandardFormController
 {
+    /**
+     * Returns the model service name for this controller.
+     */
+    protected function getModelName(): string
+    {
+        return 'mautic.emailthreads.model.thread';
+    }
     public function __construct(
         private EmailThreadModel $threadModel,
         protected CoreParametersHelper $coreParametersHelper,
