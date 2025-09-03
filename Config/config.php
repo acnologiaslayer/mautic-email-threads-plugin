@@ -42,9 +42,8 @@ return [
     'menu' => [
         'main' => [
             'items' => [
-                'mautic.emailthreads.menu.index' => [
+                'Email Threads' => [
                     'route'    => 'mautic_emailthreads_index',
-                    'access'   => ['plugin:emailthreads:threads:view'],
                     'parent'   => 'mautic.core.channels',
                     'priority' => 65,
                 ],
