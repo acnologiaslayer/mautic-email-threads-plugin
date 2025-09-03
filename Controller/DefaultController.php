@@ -32,15 +32,15 @@ class DefaultController extends AbstractStandardFormController
     }
     public function indexAction(Request $request): Response
     {
+        // Enable error display for debugging
+        error_reporting(E_ALL);
+        ini_set('display_errors', 1);
+        
         try {
-            error_log('EmailThreads indexAction called');
+            return new Response('<h1>Email Threads Plugin Works!</h1><p>Controller is accessible. PHP errors should be visible now.</p>');
             
-            // Simple test - just return a basic response
-            return new Response('<h1>Email Threads Plugin Works!</h1><p>Controller is accessible.</p>');
-            
-        } catch (\Exception $e) {
-            error_log('EmailThreads Error: ' . $e->getMessage());
-            return new Response('Error: ' . $e->getMessage());
+        } catch (\Throwable $e) {
+            return new Response('Error: ' . $e->getMessage() . '<br>File: ' . $e->getFile() . '<br>Line: ' . $e->getLine() . '<br>Trace: ' . $e->getTraceAsString());
         }
     }
 
