@@ -18,7 +18,7 @@ class EmailThreadModel
     ) {
     }
 
-    public function getRepository(): EmailThreadRepository
+    public function getRepository()
     {
         return $this->entityManager->getRepository(EmailThread::class);
     }
