@@ -44,7 +44,7 @@ return [
             'items' => [
                 'mautic.emailthreads.menu.index' => [
                     'route'    => 'mautic_emailthreads_index',
-                    'access'   => ['emailthreads:threads:view'],
+                    'access'   => ['plugin:emailthreads:threads:view'],
                     'parent'   => 'mautic.core.channels',
                     'priority' => 65,
                 ],
