@@ -175,20 +175,6 @@ class EmailSubscriber implements EventSubscriberInterface
         // Append to email content
         $event->setContent($content . $threadFooter);
     }
-                
-                $modifiedContent = $content . $threadLink;
-                $event->setContent($modifiedContent);
-            }
-            
-            // Add message to thread
-            $emailStat = $event->getStat();
-            $this->messageModel->addMessageToThread($thread, $email, $emailStat, $event);
-            
-        } catch (\Exception $e) {
-            // Log error but don't break email sending
-            error_log('Email Threads Plugin Error during send: ' . $e->getMessage());
-        }
-    }
 
     /**
      * Handle email display events (for tracking when emails are viewed)
