@@ -1,0 +1,308 @@
+/* Email Threads Plugin Styles */
+
+.emailthreads-container {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.emailthreads-header {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    color: white;
+    padding: 20px;
+    text-align: center;
+}
+
+.emailthreads-title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.emailthreads-subtitle {
+    margin: 5px 0 0 0;
+    opacity: 0.9;
+    font-size: 0.9rem;
+}
+
+.thread-list {
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+.thread-item {
+    border-bottom: 1px solid #e9ecef;
+    transition: background-color 0.2s ease;
+}
+
+.thread-item:hover {
+    background-color: #f8f9fa;
+}
+
+.thread-item:last-child {
+    border-bottom: none;
+}
+
+.thread-link {
+    display: block;
+    padding: 15px 20px;
+    text-decoration: none;
+    color: inherit;
+}
+
+.thread-link:hover {
+    text-decoration: none;
+    color: inherit;
+}
+
+.thread-subject {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.thread-meta {
+    font-size: 0.875rem;
+    color: #6c757d;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.thread-lead {
+    font-weight: 500;
+}
+
+.thread-stats {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.message-count {
+    background: #007bff;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.thread-date {
+    font-size: 0.8rem;
+}
+
+/* Message Display */
+.message-container {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    background: white;
+}
+
+.message-header {
+    background: #f8f9fa;
+    padding: 15px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.message-subject {
+    margin: 0 0 8px 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.message-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.message-sender {
+    font-weight: 500;
+}
+
+.message-type-badge {
+    background: #e9ecef;
+    color: #495057;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.message-type-campaign {
+    background: #d4edda;
+    color: #155724;
+}
+
+.message-type-broadcast {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.message-type-template {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.message-content {
+    padding: 20px;
+    line-height: 1.6;
+}
+
+.message-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+}
+
+.message-content a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.message-content a:hover {
+    text-decoration: underline;
+}
+
+/* Thread Navigation */
+.thread-nav {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    position: sticky;
+    top: 20px;
+}
+
+.thread-nav-title {
+    margin: 0 0 15px 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.thread-details {
+    font-size: 0.875rem;
+}
+
+.thread-details dt {
+    font-weight: 600;
+    color: #495057;
+    margin-top: 10px;
+}
+
+.thread-details dd {
+    margin-bottom: 5px;
+    color: #6c757d;
+}
+
+.thread-id {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    background: #f8f9fa;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.8rem;
+}
+
+/* Status indicators */
+.status-active {
+    color: #28a745;
+    font-weight: 600;
+}
+
+.status-inactive {
+    color: #6c757d;
+    font-weight: 600;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .thread-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    
+    .thread-stats {
+        gap: 10px;
+    }
+    
+    .message-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    
+    .thread-nav {
+        position: static;
+        margin-top: 20px;
+    }
+}
+
+/* Loading states */
+.emailthreads-loading {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6c757d;
+}
+
+.emailthreads-loading .spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 10px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Empty states */
+.emailthreads-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6c757d;
+}
+
+.emailthreads-empty-icon {
+    font-size: 3rem;
+    margin-bottom: 15px;
+    opacity: 0.5;
+}
+
+.emailthreads-empty-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.emailthreads-empty-text {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+/* Action buttons */
+.emailthreads-actions {
+    padding: 15px 20px;
+    background: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+    text-align: center;
+}
+
+.btn-thread-action {
+    margin: 0 5px;
+}

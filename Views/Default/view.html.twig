@@ -1,0 +1,98 @@
+{% extends '@MauticCore/Default/content.html.twig' %}
+
+{% set mauticContent = 'emailthreads' %}
+
+{% block headerTitle %}{{ 'mautic.emailthreads.thread.view'|trans({'%subject%': thread.subject}) }}{% endblock %}
+
+{% block actions %}
+    <div class="btn-group">
+        <a href="{{ path('mautic_emailthreads_index') }}" class="btn btn-default">
+            <i class="fa fa-arrow-left"></i>
+            {{ 'mautic.core.back'|trans }}
+        </a>
+        <a href="{{ path('mautic_emailthreads_public', {'threadId': thread.threadId}) }}" 
+           class="btn btn-primary" target="_blank">
+            <i class="fa fa-external-link"></i>
+            {{ 'mautic.emailthreads.view_public'|trans }}
+        </a>
+    </div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h3 class="panel-title">{{ 'mautic.emailthreads.messages'|trans }}</h3>
+            </div>
+            <div class="panel-body">
+                {% if thread.messages is empty %}
+                    <p class="text-muted">{{ 'mautic.emailthreads.no_messages'|trans }}</p>
+                {% else %}
+                    {% for message in thread.messages %}
+                        <div class="email-message" style="border-left: 3px solid #007bff; padding: 15px; margin-bottom: 20px; background: #f8f9fa;">
+                            <div class="message-header" style="margin-bottom: 10px;">
+                                <h5 style="margin: 0; color: #333;">
+                                    {{ message.subject }}
+                                </h5>
+                                <small class="text-muted">
+                                    From: {{ message.fromName ?: message.fromEmail }}
+                                    | {{ message.dateSent|date('Y-m-d H:i:s') }}
+                                    | Type: {{ message.emailType|title }}
+                                </small>
+                            </div>
+                            <div class="message-content">
+                                {{ message.content|raw }}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h3 class="panel-title">{{ 'mautic.emailthreads.thread.details'|trans }}</h3>
+            </div>
+            <div class="panel-body">
+                <dl>
+                    <dt>{{ 'mautic.emailthreads.thread.id'|trans }}</dt>
+                    <dd><code>{{ thread.threadId }}</code></dd>
+                    
+                    <dt>{{ 'mautic.emailthreads.thread.lead'|trans }}</dt>
+                    <dd>
+                        {% if thread.lead %}
+                            <a href="{{ path('mautic_contact_action', {'objectAction': 'view', 'objectId': thread.lead.id}) }}">
+                                {{ thread.lead.name ?: thread.lead.email }}
+                            </a>
+                        {% else %}
+                            <em>{{ 'mautic.emailthreads.unknown_lead'|trans }}</em>
+                        {% endif %}
+                    </dd>
+                    
+                    <dt>{{ 'mautic.emailthreads.thread.subject'|trans }}</dt>
+                    <dd>{{ thread.subject }}</dd>
+                    
+                    <dt>{{ 'mautic.emailthreads.thread.message_count'|trans }}</dt>
+                    <dd>{{ thread.messageCount }}</dd>
+                    
+                    <dt>{{ 'mautic.emailthreads.thread.first_message'|trans }}</dt>
+                    <dd>{{ thread.firstMessageDate|date('Y-m-d H:i:s') }}</dd>
+                    
+                    <dt>{{ 'mautic.emailthreads.thread.last_message'|trans }}</dt>
+                    <dd>{{ thread.lastMessageDate|date('Y-m-d H:i:s') }}</dd>
+                    
+                    <dt>{{ 'mautic.emailthreads.thread.status'|trans }}</dt>
+                    <dd>
+                        <span class="label label-{{ thread.isActive ? 'success' : 'default' }}">
+                            {{ (thread.isActive ? 'mautic.emailthreads.active' : 'mautic.emailthreads.inactive')|trans }}
+                        </span>
+                    </dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
