@@ -68,7 +68,6 @@ return [
                 'class'     => \MauticPlugin\MauticEmailThreadsBundle\EventListener\InstallSubscriber::class,
                 'arguments' => [
                     'doctrine.orm.entity_manager',
-                    'mautic.schema.helper.factory',
                 ],
                 'tags' => ['kernel.event_subscriber'],
             ],

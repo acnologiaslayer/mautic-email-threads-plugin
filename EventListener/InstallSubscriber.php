@@ -6,7 +6,6 @@ namespace MauticPlugin\MauticEmailThreadsBundle\EventListener;
 
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
-use Mautic\CoreBundle\Helper\SchemaHelperFactory;
 use Mautic\PluginBundle\Event\PluginInstallEvent;
 use Mautic\PluginBundle\Event\PluginUpdateEvent;
 use Mautic\PluginBundle\PluginEvents;
@@ -17,8 +16,7 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 class InstallSubscriber implements EventSubscriberInterface
 {
     public function __construct(
-        private EntityManagerInterface $entityManager,
-        private SchemaHelperFactory $schemaHelperFactory
+        private EntityManagerInterface $entityManager
     ) {
     }
 
