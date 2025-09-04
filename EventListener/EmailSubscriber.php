@@ -39,18 +39,27 @@ class EmailSubscriber implements EventSubscriberInterface
     {
         return [
             EmailEvents::EMAIL_ON_SEND     => ['onEmailSend', 0],
-            EmailEvents::EMAIL_ON_DISPLAY  => ['onEmailDisplay', 0],
+            EmailEvents::EMAIL_ON_DISPLAY  => ['onEmailDisplay', 0], 
             EmailEvents::EMAIL_PRE_SEND    => ['onEmailPreSend', 0],
-            // Add more email events to catch all possibilities
+            // Add more email events to catch all possibilities including campaigns
             'mautic.email_on_send'         => ['onEmailSend', 0],
             'mautic.email_pre_send'        => ['onEmailPreSend', 0],
+            'mautic.campaign_on_trigger'   => ['onCampaignTrigger', 0],
+            // Campaign events that might be used for segment emails
+            'mautic.campaign.on_event_trigger' => ['onCampaignEventTrigger', 0],
         ];
     }
 
     public function onEmailSend(EmailSendEvent $event): void
     {
-        // Simple file logging to verify the event is triggered
+        // Enhanced logging to debug segment emails
+        $email = $event->getEmail();
+        $leadData = $event->getLead();
+        
         file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - EmailSubscriber::onEmailSend called\n", FILE_APPEND);
+        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Email type: " . ($email ? $email->getEmailType() : 'null') . "\n", FILE_APPEND);
+        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Email subject: " . ($email ? $email->getSubject() : 'null') . "\n", FILE_APPEND);
+        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Lead data type: " . (is_array($leadData) ? 'array' : (is_object($leadData) ? get_class($leadData) : gettype($leadData))) . "\n", FILE_APPEND);
         
         // Check if services are available
         if (!$this->threadModel || !$this->messageModel) {
@@ -116,6 +125,8 @@ class EmailSubscriber implements EventSubscriberInterface
             
             // Generate thread content with quoted previous messages (exclude current message)
             $previousMessages = array_slice($allMessages, 0, -1); // All except the last (current) message
+            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Previous messages for threading: " . count($previousMessages) . "\n", FILE_APPEND);
+            
             $threadContent = $this->generateThreadContentWithPrevious($previousMessages, $email, $event);
             
             // Debug logging
@@ -126,8 +137,10 @@ class EmailSubscriber implements EventSubscriberInterface
             if (!empty($threadContent)) {
                 $this->injectThreadContent($event, $threadContent, $thread);
                 error_log("EmailThreads: Injected thread content into email");
+                file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Successfully injected thread content\n", FILE_APPEND);
             } else {
                 error_log("EmailThreads: No thread content to inject (first message)");
+                file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - No thread content to inject (first message or no previous messages)\n", FILE_APPEND);
             }
             
         } catch (\Exception $e) {
@@ -141,9 +154,14 @@ class EmailSubscriber implements EventSubscriberInterface
      */
     private function generateThreadContentWithPrevious(array $previousMessages, $currentEmail, $event): string
     {
+        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - generateThreadContentWithPrevious called with " . count($previousMessages) . " messages\n", FILE_APPEND);
+        
         if (empty($previousMessages)) {
+            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - No previous messages to show\n", FILE_APPEND);
             return ''; // No previous messages to show
         }
+        
+        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Generating thread content with " . count($previousMessages) . " previous messages\n", FILE_APPEND);
         
         $threadHtml = '<div class="email-thread-history" style="margin-top: 20px; border-top: 1px solid #ddd; padding-top: 15px;">';
         $threadHtml .= '<h4 style="margin: 0 0 15px 0; font-size: 14px; color: #666;">Previous Messages:</h4>';
@@ -316,6 +334,30 @@ class EmailSubscriber implements EventSubscriberInterface
         file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - EmailSubscriber::onEmailPreSend called\n", FILE_APPEND);
         // This can be used for additional pre-processing
         // Implementation can be added later if needed
+    }
+
+    /**
+     * Handle campaign trigger events (for segment emails)
+     */
+    public function onCampaignTrigger($event): void
+    {
+        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - EmailSubscriber::onCampaignTrigger called\n", FILE_APPEND);
+        // Check if this is an email campaign and process accordingly
+        if (method_exists($event, 'getEmail') && $event->getEmail()) {
+            $this->onEmailSend($event);
+        }
+    }
+
+    /**
+     * Handle campaign event trigger (for segment emails)
+     */
+    public function onCampaignEventTrigger($event): void
+    {
+        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - EmailSubscriber::onCampaignEventTrigger called\n", FILE_APPEND);
+        // Check if this is an email campaign and process accordingly
+        if (method_exists($event, 'getEmail') && $event->getEmail()) {
+            $this->onEmailSend($event);
+        }
     }
 
     private function generateThreadUrl(string $threadId): string
