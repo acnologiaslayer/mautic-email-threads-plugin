@@ -105,11 +105,19 @@ class EmailSubscriber implements EventSubscriberInterface
             }
             
             if (!$leadId || !$leadEmail) {
+                file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Missing leadId or leadEmail, leadId: " . ($leadId ?? 'null') . ", leadEmail: " . ($leadEmail ?? 'null') . "\n", FILE_APPEND);
                 return;
             }
             
+            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - About to create/find thread for leadId: " . $leadId . ", leadEmail: " . $leadEmail . "\n", FILE_APPEND);
+            
             // Create or update thread - pass lead data that we have
             $thread = $this->threadModel->findOrCreateThread($leadData, $email, $event);
+            
+            if (!$thread) {
+                file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - ERROR: Failed to create/find thread\n", FILE_APPEND);
+                return;
+            }
             
             // Debug logging
             error_log("EmailThreads: Thread ID: " . $thread->getThreadId() . ", Lead ID: " . $leadId);
@@ -117,11 +125,19 @@ class EmailSubscriber implements EventSubscriberInterface
             
             // First add the current message to get all thread messages
             $currentMessage = $this->messageModel->addMessageToThread($thread, $email, null, $event);
+            if (!$currentMessage) {
+                file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - ERROR: Failed to add current message to thread\n", FILE_APPEND);
+                return;
+            }
             file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Added current message to thread\n", FILE_APPEND);
             
             // Now inject quoted content from previous messages
             $allMessages = $this->messageModel->getMessagesByThread($thread);
             file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Total messages in thread now: " . count($allMessages) . "\n", FILE_APPEND);
+            
+            if (empty($allMessages)) {
+                file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - WARNING: No messages found in thread after adding current message\n", FILE_APPEND);
+            }
             
             // Generate thread content with quoted previous messages (exclude current message)
             $previousMessages = array_slice($allMessages, 0, -1); // All except the last (current) message
@@ -145,7 +161,9 @@ class EmailSubscriber implements EventSubscriberInterface
             
         } catch (\Exception $e) {
             // Log error but don't break email sending
-            error_log('EmailThreads error: ' . $e->getMessage());
+            error_log('EmailThreads error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
+            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - EXCEPTION: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine() . "\n", FILE_APPEND);
+            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - STACK TRACE: " . $e->getTraceAsString() . "\n", FILE_APPEND);
         }
     }
 

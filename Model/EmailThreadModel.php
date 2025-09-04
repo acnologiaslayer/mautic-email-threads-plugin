@@ -73,12 +73,24 @@ class EmailThreadModel
         // Create new thread
         $thread = new EmailThread();
         
-        // Set lead reference (use entity if available, otherwise just store the ID)
+        // Handle lead data properly for both entity and array cases
         if ($leadEntity) {
             $thread->setLead($leadEntity);
         } else {
-            // We'll need to handle this case - for now, skip setting lead entity
-            // The thread will be identified by other means
+            // For array lead data, we need to get the Lead entity
+            // Try to load the lead entity from the lead ID
+            try {
+                $leadRepository = $this->em->getRepository(Lead::class);
+                $leadEntity = $leadRepository->find($leadId);
+                if ($leadEntity) {
+                    $thread->setLead($leadEntity);
+                } else {
+                    throw new \RuntimeException("Lead not found with ID: " . $leadId);
+                }
+            } catch (\Exception $e) {
+                // If we can't load the lead entity, we can't create a proper thread
+                throw new \RuntimeException("Failed to load lead entity: " . $e->getMessage());
+            }
         }
         
         $thread->setSubject($subject);
