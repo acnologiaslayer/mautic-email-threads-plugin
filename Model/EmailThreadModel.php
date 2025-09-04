@@ -61,7 +61,20 @@ class EmailThreadModel
         }
         
         // Check if thread already exists for this lead and subject
-        $existingThreads = $this->getRepository()->findThreadsBySubject($subject, $leadId);
+        try {
+            $existingThreads = $this->getRepository()->findThreadsBySubject($subject, $leadId);
+        } catch (\Exception $e) {
+            // Fallback to basic doctrine query if custom repository method fails
+            $existingThreads = $this->entityManager->createQueryBuilder()
+                ->select('t')
+                ->from(EmailThread::class, 't')
+                ->where('t.subject = :subject')
+                ->andWhere('t.lead = :leadId')
+                ->setParameter('subject', $subject)
+                ->setParameter('leadId', $leadId)
+                ->getQuery()
+                ->getResult();
+        }
         
         if (!empty($existingThreads)) {
             $thread = $existingThreads[0]; // Use the first matching thread

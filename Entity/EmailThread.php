@@ -11,7 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 use Mautic\CoreBundle\Entity\CommonEntity;
 use Mautic\LeadBundle\Entity\Lead;
 
-#[ORM\Entity(repositoryClass: EmailThreadRepository::class)]
+#[ORM\Entity(repositoryClass: \MauticPlugin\MauticEmailThreadsBundle\Entity\EmailThreadRepository::class)]
 #[ORM\Table(name: 'email_threads')]
 #[ORM\Index(columns: ['thread_id'], name: 'thread_id_idx')]
 #[ORM\Index(columns: ['lead_id'], name: 'thread_lead_idx')]
