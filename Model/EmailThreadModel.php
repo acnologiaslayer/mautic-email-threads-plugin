@@ -14,13 +14,13 @@ use MauticPlugin\MauticEmailThreadsBundle\Entity\EmailThreadRepository;
 class EmailThreadModel
 {
     public function __construct(
-        private EntityManagerInterface $entityManager
+        private EntityManagerInterface $em
     ) {
     }
 
     public function getRepository()
     {
-        return $this->entityManager->getRepository(EmailThread::class);
+        return $this->em->getRepository(EmailThread::class);
     }
 
     public function getEntity($id = null): ?EmailThread
@@ -34,8 +34,8 @@ class EmailThreadModel
 
     public function saveEntity(EmailThread $entity): void
     {
-        $this->entityManager->persist($entity);
-        $this->entityManager->flush();
+        $this->em->persist($entity);
+        $this->em->flush();
     }
 
     public function findOrCreateThread($leadData, Email $email, EmailSendEvent $event): EmailThread
