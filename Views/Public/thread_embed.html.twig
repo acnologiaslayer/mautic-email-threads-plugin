@@ -3,142 +3,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Email Thread (Embedded): {{ thread.subject }}</title>
+    <title>Email Thread: {{ thread.subject }}</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            margin: 0;
-            padding: 15px;
-            background: #f8f9fa;
-            font-size: 14px;
-            line-height: 1.5;
-        }
-        .thread-container {
+        .email-thread-embed {
             max-width: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            line-height: 1.4;
         }
-        .thread-header {
-            background: white;
+        .thread-header-embed {
+            background: #f8f9fa;
             padding: 15px;
             border-radius: 6px;
             margin-bottom: 15px;
             border-left: 3px solid #007bff;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
-        .thread-title {
-            margin: 0 0 8px 0;
-            font-size: 16px;
-            font-weight: 600;
-            color: #333;
-        }
-        .thread-meta {
-            font-size: 12px;
-            color: #666;
-        }
-        .message {
+        .message-item-embed {
             background: white;
+            border: 1px solid #dee2e6;
             border-radius: 6px;
             margin-bottom: 12px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             overflow: hidden;
         }
-        .message-header {
+        .message-header-embed {
             background: #f8f9fa;
-            padding: 12px 15px;
-            border-bottom: 1px solid #e9ecef;
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+            font-size: 12px;
         }
-        .message-title {
-            margin: 0 0 4px 0;
-            font-size: 14px;
-            font-weight: 500;
-            color: #333;
-        }
-        .message-meta {
-            font-size: 11px;
-            color: #666;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .message-content {
+        .message-content-embed {
             padding: 15px;
-            color: #333;
+            line-height: 1.5;
         }
-        .message-content img {
-            max-width: 100%;
-            height: auto;
+        .message-meta-embed {
+            font-size: 0.8rem;
+            color: #6c757d;
         }
-        .message-content a {
-            color: #007bff;
-            text-decoration: none;
-        }
-        .message-content a:hover {
-            text-decoration: underline;
-        }
-        .type-badge {
-            background: #e9ecef;
-            color: #495057;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 10px;
-            text-transform: uppercase;
-            font-weight: 500;
-        }
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: #666;
-        }
-        .footer {
-            margin-top: 20px;
+        .thread-footer-embed {
+            margin-top: 15px;
             padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #6c757d;
             text-align: center;
-            font-size: 10px;
-            color: #999;
-            border-top: 1px solid #e9ecef;
         }
     </style>
 </head>
 <body>
-    <div class="thread-container">
-        <div class="thread-header">
-            <h2 class="thread-title">{{ thread.subject }}</h2>
-            <div class="thread-meta">
-                {% if thread.lead %}
-                    Conversation with {{ thread.lead.name ?: thread.lead.email }}
-                {% endif %}
+    <div class="email-thread-embed">
+        <div class="thread-header-embed">
+            <h4 style="margin: 0 0 8px 0; font-size: 16px;">{{ thread.subject }}</h4>
+            <div class="message-meta-embed">
+                Conversation with {{ thread.lead ? (thread.lead.name ?: thread.lead.email) : 'Unknown' }}
                 | {{ messages|length }} message{{ messages|length != 1 ? 's' : '' }}
                 | Started {{ thread.firstMessageDate|date('M j, Y') }}
             </div>
         </div>
 
-        {% if messages is empty %}
-            <div class="empty-state">
-                <p>No messages in this conversation yet.</p>
-            </div>
-        {% else %}
-            {% for message in messages %}
-                <div class="message">
-                    <div class="message-header">
-                        <h3 class="message-title">{{ message.subject }}</h3>
-                        <div class="message-meta">
-                            <span>
-                                From: <strong>{{ message.fromName ?: message.fromEmail }}</strong>
-                            </span>
-                            <span>
-                                {{ message.dateSent|date('M j, g:i A') }}
-                                <span class="type-badge">{{ message.emailType }}</span>
-                            </span>
+        <div class="messages-container">
+            {% if messages is empty %}
+                <div style="padding: 20px; text-align: center; color: #6c757d;">
+                    <p>No messages found in this conversation thread.</p>
+                </div>
+            {% else %}
+                {% for message in messages %}
+                    <div class="message-item-embed">
+                        <div class="message-header-embed">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div>
+                                    <strong>{{ message.subject }}</strong>
+                                    <div class="message-meta-embed">
+                                        From: {{ message.fromName ?: message.fromEmail }}
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div class="message-meta-embed">
+                                        {{ message.dateSent|date('M j, Y \\a\\t g:i A') }}
+                                    </div>
+                                    <span style="background: #6c757d; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px;">
+                                        {{ message.emailType|title }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="message-content-embed">
+                            {{ message.content|striptags('<p><br><strong><em><u><a><ul><ol><li><h1><h2><h3><h4><h5><h6>')|raw }}
                         </div>
                     </div>
-                    <div class="message-content">
-                        {{ message.content|raw }}
-                    </div>
-                </div>
-            {% endfor %}
-        {% endif %}
+                {% endfor %}
+            {% endif %}
+        </div>
 
-        <div class="footer">
-            Powered by Mautic Email Threads | Thread: {{ thread.threadId }}
+        <div class="thread-footer-embed">
+            Powered by Mautic Email Threads | Thread ID: {{ thread.threadId }}
         </div>
     </div>
 </body>

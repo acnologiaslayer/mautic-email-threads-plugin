@@ -37,19 +37,24 @@ class DefaultController extends AbstractStandardFormController
             throw new AccessDeniedException();
         }
 
-        // For now, just return a simple response to verify the plugin is working
-        // We'll implement the full functionality once entity mapping is resolved
-        return new Response('
-            <h1>Email Threads Plugin</h1>
-            <p>Plugin is successfully loaded and accessible.</p>
-            <p>Next steps:</p>
-            <ul>
-                <li>Database tables created: email_threads, email_thread_messages</li>
-                <li>Routes are working: /s/emailthreads</li>
-                <li>Ready for email thread functionality</li>
-            </ul>
-            <p><a href="/s/admin">Back to Admin</a></p>
-        ');
+        try {
+            // Get all active threads
+            $threads = $this->threadModel->findActiveThreads();
+            
+            return $this->render('@MauticEmailThreads/Default/index.html.twig', [
+                'threads' => $threads,
+            ]);
+        } catch (\Exception $e) {
+            error_log('EmailThreads: Error in indexAction: ' . $e->getMessage());
+            
+            // Fallback to simple response if there's an error
+            return new Response('
+                <h1>Email Threads Plugin</h1>
+                <p>Plugin is successfully loaded and accessible.</p>
+                <p>Error loading threads: ' . htmlspecialchars($e->getMessage()) . '</p>
+                <p><a href="/s/admin">Back to Admin</a></p>
+            ');
+        }
     }
 
     public function viewAction(Request $request, int $id): Response

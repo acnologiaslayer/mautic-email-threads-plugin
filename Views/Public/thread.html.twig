@@ -88,7 +88,7 @@
                             </div>
                         </div>
                         <div class="message-content">
-                            {{ message.content|raw }}
+                            {{ message.content|striptags('<p><br><strong><em><u><a><ul><ol><li><h1><h2><h3><h4><h5><h6>')|raw }}
                         </div>
                     </div>
                 {% endfor %}

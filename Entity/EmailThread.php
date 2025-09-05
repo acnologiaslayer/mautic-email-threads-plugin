@@ -15,6 +15,9 @@ use Mautic\LeadBundle\Entity\Lead;
 #[ORM\Table(name: 'email_threads')]
 #[ORM\Index(columns: ['thread_id'], name: 'thread_id_idx')]
 #[ORM\Index(columns: ['lead_id'], name: 'thread_lead_idx')]
+#[ORM\Index(columns: ['is_active'], name: 'thread_active_idx')]
+#[ORM\Index(columns: ['last_message_date'], name: 'thread_last_message_idx')]
+#[ORM\Index(columns: ['subject', 'lead_id'], name: 'thread_subject_lead_idx')]
 class EmailThread extends CommonEntity
 {
     #[ORM\Column(type: Types::STRING, length: 255, unique: true)]

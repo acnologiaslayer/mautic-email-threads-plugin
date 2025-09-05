@@ -14,6 +14,8 @@ use Mautic\EmailBundle\Entity\Stat;
 #[ORM\Table(name: 'email_thread_messages')]
 #[ORM\Index(columns: ['thread_id'], name: 'message_thread_idx')]
 #[ORM\Index(columns: ['email_stat_id'], name: 'message_stat_idx')]
+#[ORM\Index(columns: ['date_sent'], name: 'message_date_sent_idx')]
+#[ORM\Index(columns: ['email_type'], name: 'message_email_type_idx')]
 class EmailThreadMessage extends CommonEntity
 {
     #[ORM\ManyToOne(targetEntity: EmailThread::class, inversedBy: 'messages')]

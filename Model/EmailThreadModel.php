@@ -63,10 +63,10 @@ class EmailThreadModel
         // Check if thread already exists for this lead and subject
         try {
             $existingThreads = $this->getRepository()->findThreadsBySubject($subject, $leadId);
-            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Used custom repository method, found " . count($existingThreads) . " threads\n", FILE_APPEND);
+            error_log('EmailThreads: Used custom repository method, found ' . count($existingThreads) . ' threads');
         } catch (\Exception $e) {
             // Fallback to basic doctrine query if custom repository method fails
-            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Custom repository failed: " . $e->getMessage() . ", using fallback\n", FILE_APPEND);
+            error_log('EmailThreads: Custom repository failed: ' . $e->getMessage() . ', using fallback');
             $existingThreads = $this->em->createQueryBuilder()
                 ->select('t')
                 ->from(EmailThread::class, 't')
@@ -76,18 +76,18 @@ class EmailThreadModel
                 ->setParameter('leadId', $leadId)
                 ->getQuery()
                 ->getResult();
-            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Fallback query found " . count($existingThreads) . " threads\n", FILE_APPEND);
+            error_log('EmailThreads: Fallback query found ' . count($existingThreads) . ' threads');
         }
         
         if (!empty($existingThreads)) {
             $thread = $existingThreads[0]; // Use the first matching thread
             $thread->setLastMessageDate(new \DateTime());
             $this->saveEntity($thread);
-            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Using existing thread: " . $thread->getThreadId() . "\n", FILE_APPEND);
+            error_log('EmailThreads: Using existing thread: ' . $thread->getThreadId());
             return $thread;
         }
 
-        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Creating new thread for subject: " . $subject . "\n", FILE_APPEND);
+        error_log('EmailThreads: Creating new thread for subject: ' . $subject);
 
         // Create new thread
         $thread = new EmailThread();
@@ -124,7 +124,7 @@ class EmailThreadModel
         $thread->setLastMessageDate(new \DateTime());
 
         $this->saveEntity($thread);
-        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Successfully created new thread: " . $thread->getThreadId() . "\n", FILE_APPEND);
+        error_log('EmailThreads: Successfully created new thread: ' . $thread->getThreadId());
         
         return $thread;
     }

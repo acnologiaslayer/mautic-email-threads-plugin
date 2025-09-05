@@ -4,7 +4,7 @@ A comprehensive plugin for **Mautic 5.x** that enables email threading functiona
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Mautic](https://img.shields.io/badge/mautic-5.x-orange.svg)
-![PHP](https://img.shields.io/badge/php-8.4-blue.svg)
+![PHP](https://img.shields.io/badge/php-8.1+-blue.svg)
 ![Symfony](https://img.shields.io/badge/symfony-7.3-green.svg)
 
 ## ✨ Features
@@ -22,7 +22,7 @@ A comprehensive plugin for **Mautic 5.x** that enables email threading functiona
 ## 📋 Requirements
 
 - **Mautic 5.x** or higher
-- **PHP 8.4** or higher  
+- **PHP 8.1** or higher  
 - **Symfony 7.3** or higher
 - **MySQL 5.7+** or **MariaDB 10.2+**
 
@@ -57,7 +57,7 @@ A comprehensive plugin for **Mautic 5.x** that enables email threading functiona
 
 This plugin has been completely updated for **Mautic 5.x** with:
 
-- **Modern PHP 8.4** with strict typing and attributes
+- **Modern PHP 8.1+** with strict typing and attributes
 - **Doctrine ORM attributes** instead of legacy metadata methods
 - **Twig templates** instead of PHP templates
 - **Dependency injection** in controllers

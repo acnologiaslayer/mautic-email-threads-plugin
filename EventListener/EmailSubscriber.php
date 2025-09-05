@@ -32,7 +32,7 @@ class EmailSubscriber implements EventSubscriberInterface
         $this->router = $router;
         
         // Log constructor call
-        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - EmailSubscriber constructor called\n", FILE_APPEND);
+        error_log('EmailThreads: EmailSubscriber constructor called');
     }
 
     public static function getSubscribedEvents(): array
@@ -56,14 +56,14 @@ class EmailSubscriber implements EventSubscriberInterface
         $email = $event->getEmail();
         $leadData = $event->getLead();
         
-        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - EmailSubscriber::onEmailSend called\n", FILE_APPEND);
-        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Email type: " . ($email ? $email->getEmailType() : 'null') . "\n", FILE_APPEND);
-        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Email subject: " . ($email ? $email->getSubject() : 'null') . "\n", FILE_APPEND);
-        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Lead data type: " . (is_array($leadData) ? 'array' : (is_object($leadData) ? get_class($leadData) : gettype($leadData))) . "\n", FILE_APPEND);
+        error_log('EmailThreads: EmailSubscriber::onEmailSend called');
+        error_log('EmailThreads: Email type: ' . ($email ? $email->getEmailType() : 'null'));
+        error_log('EmailThreads: Email subject: ' . ($email ? $email->getSubject() : 'null'));
+        error_log('EmailThreads: Lead data type: ' . (is_array($leadData) ? 'array' : (is_object($leadData) ? get_class($leadData) : gettype($leadData))));
         
         // Check if services are available
         if (!$this->threadModel || !$this->messageModel) {
-            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Missing required services, skipping\n", FILE_APPEND);
+            error_log('EmailThreads: Missing required services, skipping');
             return;
         }
         
@@ -73,7 +73,6 @@ class EmailSubscriber implements EventSubscriberInterface
         
         if (!$isEnabled) {
             error_log("EmailThreads: Plugin is disabled, skipping");
-            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Plugin disabled, skipping\n", FILE_APPEND);
             return;
         }
 
@@ -81,11 +80,10 @@ class EmailSubscriber implements EventSubscriberInterface
         $email = $event->getEmail();
         
         error_log("EmailThreads: Processing email send event - Email ID: " . ($email ? $email->getId() : 'null'));
-        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Processing email ID: " . ($email ? $email->getId() : 'null') . "\n", FILE_APPEND);
+        error_log('EmailThreads: Processing email ID: ' . ($email ? $email->getId() : 'null'));
         
         if (!$leadData || !$email) {
             error_log("EmailThreads: Missing lead data or email, skipping");
-            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Missing lead data or email, skipping\n", FILE_APPEND);
             return;
         }
 
@@ -105,65 +103,61 @@ class EmailSubscriber implements EventSubscriberInterface
             }
             
             if (!$leadId || !$leadEmail) {
-                file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Missing leadId or leadEmail, leadId: " . ($leadId ?? 'null') . ", leadEmail: " . ($leadEmail ?? 'null') . "\n", FILE_APPEND);
+                error_log('EmailThreads: Missing leadId or leadEmail, leadId: ' . ($leadId ?? 'null') . ', leadEmail: ' . ($leadEmail ?? 'null'));
                 return;
             }
             
-            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - About to create/find thread for leadId: " . $leadId . ", leadEmail: " . $leadEmail . "\n", FILE_APPEND);
+            error_log('EmailThreads: About to create/find thread for leadId: ' . $leadId . ', leadEmail: ' . $leadEmail);
             
             // Create or update thread - pass lead data that we have
             $thread = $this->threadModel->findOrCreateThread($leadData, $email, $event);
             
             if (!$thread) {
-                file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - ERROR: Failed to create/find thread\n", FILE_APPEND);
+                error_log('EmailThreads: ERROR: Failed to create/find thread');
                 return;
             }
             
             // Debug logging
             error_log("EmailThreads: Thread ID: " . $thread->getThreadId() . ", Lead ID: " . $leadId);
-            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Created/found thread: " . $thread->getThreadId() . " for lead: " . $leadId . "\n", FILE_APPEND);
+            error_log('EmailThreads: Created/found thread: ' . $thread->getThreadId() . ' for lead: ' . $leadId);
             
             // First add the current message to get all thread messages
             $currentMessage = $this->messageModel->addMessageToThread($thread, $email, null, $event);
             if (!$currentMessage) {
-                file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - ERROR: Failed to add current message to thread\n", FILE_APPEND);
+                error_log('EmailThreads: ERROR: Failed to add current message to thread');
                 return;
             }
-            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Added current message to thread\n", FILE_APPEND);
+            error_log('EmailThreads: Added current message to thread');
             
             // Now inject quoted content from previous messages
             $allMessages = $this->messageModel->getMessagesByThread($thread);
-            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Total messages in thread now: " . count($allMessages) . "\n", FILE_APPEND);
+            error_log('EmailThreads: Total messages in thread now: ' . count($allMessages));
             
             if (empty($allMessages)) {
-                file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - WARNING: No messages found in thread after adding current message\n", FILE_APPEND);
+                error_log('EmailThreads: WARNING: No messages found in thread after adding current message');
             }
             
             // Generate thread content with quoted previous messages (exclude current message)
             $previousMessages = array_slice($allMessages, 0, -1); // All except the last (current) message
-            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Previous messages for threading: " . count($previousMessages) . "\n", FILE_APPEND);
+            error_log('EmailThreads: Previous messages for threading: ' . count($previousMessages));
             
             $threadContent = $this->generateThreadContentWithPrevious($previousMessages, $email, $event);
             
             // Debug logging
             error_log("EmailThreads: Generated thread content length: " . strlen($threadContent));
-            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Generated thread content length: " . strlen($threadContent) . "\n", FILE_APPEND);
             
             // Update email content with threaded conversation
             if (!empty($threadContent)) {
                 $this->injectThreadContent($event, $threadContent, $thread);
                 error_log("EmailThreads: Injected thread content into email");
-                file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Successfully injected thread content\n", FILE_APPEND);
             } else {
                 error_log("EmailThreads: No thread content to inject (first message)");
-                file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - No thread content to inject (first message or no previous messages)\n", FILE_APPEND);
             }
             
         } catch (\Exception $e) {
             // Log error but don't break email sending
             error_log('EmailThreads error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
-            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - EXCEPTION: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine() . "\n", FILE_APPEND);
-            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - STACK TRACE: " . $e->getTraceAsString() . "\n", FILE_APPEND);
+            error_log('EmailThreads stack trace: ' . $e->getTraceAsString());
         }
     }
 
@@ -172,14 +166,14 @@ class EmailSubscriber implements EventSubscriberInterface
      */
     private function generateThreadContentWithPrevious(array $previousMessages, $currentEmail, $event): string
     {
-        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - generateThreadContentWithPrevious called with " . count($previousMessages) . " messages\n", FILE_APPEND);
+        error_log('EmailThreads: generateThreadContentWithPrevious called with ' . count($previousMessages) . ' messages');
         
         if (empty($previousMessages)) {
-            file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - No previous messages to show\n", FILE_APPEND);
+            error_log('EmailThreads: No previous messages to show');
             return ''; // No previous messages to show
         }
         
-        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - Generating thread content with " . count($previousMessages) . " previous messages\n", FILE_APPEND);
+        error_log('EmailThreads: Generating thread content with ' . count($previousMessages) . ' previous messages');
         
         $threadHtml = '<div class="email-thread-history" style="margin-top: 20px; border-top: 1px solid #ddd; padding-top: 15px;">';
         $threadHtml .= '<h4 style="margin: 0 0 15px 0; font-size: 14px; color: #666;">Previous Messages:</h4>';
@@ -339,7 +333,7 @@ class EmailSubscriber implements EventSubscriberInterface
      */
     public function onEmailDisplay($event): void
     {
-        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - EmailSubscriber::onEmailDisplay called\n", FILE_APPEND);
+        error_log('EmailThreads: EmailSubscriber::onEmailDisplay called');
         // This can be used to track email opens in threads
         // Implementation can be added later if needed
     }
@@ -349,7 +343,7 @@ class EmailSubscriber implements EventSubscriberInterface
      */
     public function onEmailPreSend($event): void
     {
-        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - EmailSubscriber::onEmailPreSend called\n", FILE_APPEND);
+        error_log('EmailThreads: EmailSubscriber::onEmailPreSend called');
         // This can be used for additional pre-processing
         // Implementation can be added later if needed
     }
@@ -359,7 +353,7 @@ class EmailSubscriber implements EventSubscriberInterface
      */
     public function onCampaignTrigger($event): void
     {
-        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - EmailSubscriber::onCampaignTrigger called\n", FILE_APPEND);
+        error_log('EmailThreads: EmailSubscriber::onCampaignTrigger called');
         // Check if this is an email campaign and process accordingly
         if (method_exists($event, 'getEmail') && $event->getEmail()) {
             $this->onEmailSend($event);
@@ -371,7 +365,7 @@ class EmailSubscriber implements EventSubscriberInterface
      */
     public function onCampaignEventTrigger($event): void
     {
-        file_put_contents('/tmp/emailthreads_debug.log', date('Y-m-d H:i:s') . " - EmailSubscriber::onCampaignEventTrigger called\n", FILE_APPEND);
+        error_log('EmailThreads: EmailSubscriber::onCampaignEventTrigger called');
         // Check if this is an email campaign and process accordingly
         if (method_exists($event, 'getEmail') && $event->getEmail()) {
             $this->onEmailSend($event);
