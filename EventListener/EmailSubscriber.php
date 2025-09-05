@@ -73,6 +73,12 @@ class EmailSubscriber implements EventSubscriberInterface
                 error_log('EmailThreads: Using EMAIL_ON_SEND event');
             }
             
+            // Try EMAIL_PRE_SEND if available (earlier in the process)
+            if (isset($constants['EMAIL_PRE_SEND'])) {
+                $events[EmailEvents::EMAIL_PRE_SEND] = ['onEmailPreSend', 200];
+                error_log('EmailThreads: Using EMAIL_PRE_SEND event');
+            }
+            
             // Use EMAIL_ON_DISPLAY if available
             if (isset($constants['EMAIL_ON_DISPLAY'])) {
                 $events[EmailEvents::EMAIL_ON_DISPLAY] = ['onEmailDisplay', 0];
@@ -85,6 +91,7 @@ class EmailSubscriber implements EventSubscriberInterface
         // Fallback to string-based event names for compatibility
         $events['mautic.email_send'] = ['onEmailSend', 100];
         $events['mautic.email_on_send'] = ['onEmailSend', 50];
+        $events['mautic.email_pre_send'] = ['onEmailPreSend', 200];
         $events['mautic.campaign_on_trigger'] = ['onCampaignTrigger', 0];
         $events['mautic.campaign.on_event_trigger'] = ['onCampaignEventTrigger', 0];
         
@@ -104,6 +111,79 @@ class EmailSubscriber implements EventSubscriberInterface
         
         // Process email threading
         $this->processEmailThreading($event);
+        
+        // Force content modification as a last resort
+        $this->forceContentModification($event);
+    }
+    
+    /**
+     * Force content modification as a last resort
+     */
+    private function forceContentModification(EmailSendEvent $event): void
+    {
+        try {
+            $content = $event->getContent();
+            if (!$content) {
+                error_log('EmailThreads: forceContentModification - No content to modify');
+                return;
+            }
+            
+            // Check if we already have thread content
+            if (strpos($content, 'email-thread-container') !== false) {
+                error_log('EmailThreads: forceContentModification - Thread content already present');
+                return;
+            }
+            
+            // Try to get thread information from the event
+            $email = $event->getEmail();
+            $leadData = $event->getLead();
+            
+            if (!$email || !$leadData) {
+                error_log('EmailThreads: forceContentModification - Missing email or lead data');
+                return;
+            }
+            
+            // Get lead information
+            $leadId = null;
+            if (is_array($leadData)) {
+                $leadId = $leadData['id'] ?? null;
+            } else {
+                $leadId = $leadData->getId();
+            }
+            
+            if (!$leadId) {
+                error_log('EmailThreads: forceContentModification - No lead ID');
+                return;
+            }
+            
+            // Try to find existing thread
+            $thread = $this->threadModel->findOrCreateThread($leadData, $email, $event);
+            if (!$thread) {
+                error_log('EmailThreads: forceContentModification - Could not find or create thread');
+                return;
+            }
+            
+            // Get existing messages
+            $existingMessages = $this->messageModel->getMessagesByThread($thread);
+            if (empty($existingMessages)) {
+                error_log('EmailThreads: forceContentModification - No existing messages');
+                return;
+            }
+            
+            // Generate thread content
+            $threadContent = $this->generateThreadContentWithPrevious($existingMessages, $email, $event);
+            if (empty($threadContent)) {
+                error_log('EmailThreads: forceContentModification - No thread content generated');
+                return;
+            }
+            
+            // Force inject the content
+            $this->injectThreadContent($event, $threadContent, $thread);
+            error_log('EmailThreads: forceContentModification - Forced content injection completed');
+            
+        } catch (\Exception $e) {
+            error_log('EmailThreads: forceContentModification - Error: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -193,32 +273,59 @@ class EmailSubscriber implements EventSubscriberInterface
             }
             error_log('EmailThreads: Added current message to thread');
             
-            // Check if we should inject previous messages into the email
-            $injectPreviousMessages = $this->coreParametersHelper ? 
-                $this->coreParametersHelper->get('emailthreads_inject_previous_messages', true) : true;
+                    // Check if we should inject previous messages into the email
+        $injectPreviousMessages = $this->coreParametersHelper ? 
+            $this->coreParametersHelper->get('emailthreads_inject_previous_messages', true) : true;
+        
+        if ($injectPreviousMessages && !empty($existingMessages)) {
+            // Generate thread content with existing messages (previous messages only)
+            $threadContent = $this->generateThreadContentWithPrevious($existingMessages, $email, $event);
             
-            if ($injectPreviousMessages && !empty($existingMessages)) {
-                // Generate thread content with existing messages (previous messages only)
-                $threadContent = $this->generateThreadContentWithPrevious($existingMessages, $email, $event);
-                
-                // Debug logging
-                error_log("EmailThreads: Generated thread content length: " . strlen($threadContent));
-                
-                // Update email content with threaded conversation
-                if (!empty($threadContent)) {
-                    $this->injectThreadContent($event, $threadContent, $thread);
-                    error_log("EmailThreads: Injected thread content into email");
-                } else {
-                    error_log("EmailThreads: No thread content to inject (first message)");
-                }
+            // Debug logging
+            error_log("EmailThreads: Generated thread content length: " . strlen($threadContent));
+            
+            // Update email content with threaded conversation
+            if (!empty($threadContent)) {
+                $this->injectThreadContent($event, $threadContent, $thread);
+                error_log("EmailThreads: Injected thread content into email");
             } else {
-                error_log("EmailThreads: Skipping thread content injection - injectPreviousMessages: " . ($injectPreviousMessages ? 'true' : 'false') . ", existingMessages: " . count($existingMessages));
+                error_log("EmailThreads: No thread content to inject (first message)");
             }
+        } else {
+            error_log("EmailThreads: Skipping thread content injection - injectPreviousMessages: " . ($injectPreviousMessages ? 'true' : 'false') . ", existingMessages: " . count($existingMessages));
+            
+            // Add a simple test message to verify the plugin is working
+            $this->addTestMessage($event);
+        }
             
         } catch (\Exception $e) {
             // Log error but don't break email sending
             error_log('EmailThreads error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
             error_log('EmailThreads stack trace: ' . $e->getTraceAsString());
+        }
+    }
+    
+    /**
+     * Add a simple test message to verify the plugin is working
+     */
+    private function addTestMessage(EmailSendEvent $event): void
+    {
+        try {
+            $content = $event->getContent();
+            if (!$content) {
+                return;
+            }
+            
+            $testMessage = '<div style="margin-top: 20px; padding: 10px; background: #f0f8ff; border-left: 3px solid #007bff; font-size: 12px; color: #666;">
+                <strong>Email Threads Plugin Test:</strong> This message confirms the plugin is working. Thread content will appear here when previous messages exist.
+            </div>';
+            
+            $newContent = $content . $testMessage;
+            $event->setContent($newContent);
+            
+            error_log('EmailThreads: addTestMessage - Added test message to email');
+        } catch (\Exception $e) {
+            error_log('EmailThreads: addTestMessage - Error: ' . $e->getMessage());
         }
     }
 
@@ -402,17 +509,81 @@ class EmailSubscriber implements EventSubscriberInterface
 
         error_log('EmailThreads: injectThreadContent - Thread footer length: ' . strlen($threadFooter));
 
-        // Append to email content
-        $newContent = $content . $threadFooter;
+        // Try multiple approaches to ensure content is modified
+        $this->modifyEmailContent($event, $content, $threadFooter);
+    }
+    
+    /**
+     * Try multiple approaches to modify email content
+     */
+    private function modifyEmailContent(EmailSendEvent $event, string $originalContent, string $threadFooter): void
+    {
+        // Approach 1: Direct content modification
+        $newContent = $originalContent . $threadFooter;
         $event->setContent($newContent);
+        error_log('EmailThreads: modifyEmailContent - Approach 1: Direct content modification');
+        error_log('EmailThreads: modifyEmailContent - New content length: ' . strlen($newContent));
         
-        error_log('EmailThreads: injectThreadContent - New content length: ' . strlen($newContent));
-        error_log('EmailThreads: injectThreadContent - Content successfully updated');
+        // Approach 2: Try to modify the email entity directly
+        try {
+            $email = $event->getEmail();
+            if ($email) {
+                $customHtml = $email->getCustomHtml();
+                if ($customHtml) {
+                    $email->setCustomHtml($customHtml . $threadFooter);
+                    error_log('EmailThreads: modifyEmailContent - Approach 2: Modified email entity customHtml');
+                }
+                
+                $plainText = $email->getPlainText();
+                if ($plainText) {
+                    $plainTextFooter = strip_tags($threadFooter);
+                    $email->setPlainText($plainText . "\n\n" . $plainTextFooter);
+                    error_log('EmailThreads: modifyEmailContent - Approach 2: Modified email entity plainText');
+                }
+            }
+        } catch (\Exception $e) {
+            error_log('EmailThreads: modifyEmailContent - Approach 2 failed: ' . $e->getMessage());
+        }
+        
+        // Approach 3: Try to modify tokens
+        try {
+            $tokens = $event->getTokens();
+            if ($tokens && isset($tokens['content'])) {
+                $tokens['content'] = $tokens['content'] . $threadFooter;
+                $event->setTokens($tokens);
+                error_log('EmailThreads: modifyEmailContent - Approach 3: Modified tokens');
+            }
+        } catch (\Exception $e) {
+            error_log('EmailThreads: modifyEmailContent - Approach 3 failed: ' . $e->getMessage());
+        }
+        
+        // Verify the content was actually modified
+        $finalContent = $event->getContent();
+        if (strpos($finalContent, 'email-thread-container') !== false) {
+            error_log('EmailThreads: modifyEmailContent - SUCCESS: Thread content found in final content');
+        } else {
+            error_log('EmailThreads: modifyEmailContent - WARNING: Thread content not found in final content');
+            error_log('EmailThreads: modifyEmailContent - Final content length: ' . strlen($finalContent));
+        }
     }
 
     /**
      * Handle email display events (for tracking when emails are viewed)
      */
+    public function onEmailPreSend($event): void
+    {
+        error_log('EmailThreads: EmailSubscriber::onEmailPreSend called');
+        
+        // Check if this is an EmailSendEvent
+        if (!$event instanceof EmailSendEvent) {
+            error_log('EmailThreads: onEmailPreSend - Event is not EmailSendEvent, skipping');
+            return;
+        }
+        
+        // Process email threading with highest priority
+        $this->processEmailThreading($event);
+    }
+
     public function onEmailDisplay($event): void
     {
         error_log('EmailThreads: EmailSubscriber::onEmailDisplay called');
