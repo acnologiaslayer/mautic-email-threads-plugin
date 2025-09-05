@@ -112,6 +112,9 @@ class EmailSubscriber implements EventSubscriberInterface
         // Check database tables exist before processing
         $this->verifyDatabaseTables();
         
+        // Add debugging information about the email and lead
+        $this->debugEmailAndLead($event);
+        
         // Check if content was already modified (contains our thread content)
         $content = $event->getContent();
         if ($content && strpos($content, 'email-thread-container') !== false) {
@@ -388,12 +391,52 @@ class EmailSubscriber implements EventSubscriberInterface
             
             // Also create a test thread to verify database functionality
             $this->createTestThread($event);
+            
+            // Force create a thread and message for this email to test threading
+            $this->forceCreateThreadForTesting($event);
         }
             
         } catch (\Exception $e) {
             // Log error but don't break email sending
             error_log('EmailThreads error: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
             error_log('EmailThreads stack trace: ' . $e->getTraceAsString());
+        }
+    }
+    
+    /**
+     * Debug email and lead information
+     */
+    private function debugEmailAndLead(EmailSendEvent $event): void
+    {
+        try {
+            $email = $event->getEmail();
+            $leadData = $event->getLead();
+            
+            error_log('EmailThreads: === EMAIL AND LEAD DEBUG ===');
+            
+            if ($email) {
+                error_log('EmailThreads: Email ID: ' . $email->getId());
+                error_log('EmailThreads: Email Subject: ' . $email->getSubject());
+                error_log('EmailThreads: Email From: ' . $email->getFromAddress());
+                error_log('EmailThreads: Email Type: ' . $email->getEmailType());
+            } else {
+                error_log('EmailThreads: ERROR - No email object in event');
+            }
+            
+            if ($leadData) {
+                if (is_array($leadData)) {
+                    error_log('EmailThreads: Lead Data (Array): ID=' . ($leadData['id'] ?? 'null') . ', Email=' . ($leadData['email'] ?? 'null'));
+                } else {
+                    error_log('EmailThreads: Lead Data (Object): ID=' . $leadData->getId() . ', Email=' . $leadData->getEmail());
+                }
+            } else {
+                error_log('EmailThreads: ERROR - No lead data in event');
+            }
+            
+            error_log('EmailThreads: === END EMAIL AND LEAD DEBUG ===');
+            
+        } catch (\Exception $e) {
+            error_log('EmailThreads: debugEmailAndLead - Error: ' . $e->getMessage());
         }
     }
     
@@ -500,6 +543,113 @@ class EmailSubscriber implements EventSubscriberInterface
             
         } catch (\Exception $e) {
             error_log('EmailThreads: createTestThread - Error: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Force create a thread and message for testing purposes
+     */
+    private function forceCreateThreadForTesting(EmailSendEvent $event): void
+    {
+        try {
+            if (!$this->entityManager) {
+                error_log('EmailThreads: forceCreateThreadForTesting - EntityManager not available');
+                return;
+            }
+            
+            $email = $event->getEmail();
+            $leadData = $event->getLead();
+            
+            if (!$email || !$leadData) {
+                error_log('EmailThreads: forceCreateThreadForTesting - Missing email or lead data');
+                return;
+            }
+            
+            // Get lead ID
+            $leadId = is_array($leadData) ? ($leadData['id'] ?? null) : $leadData->getId();
+            if (!$leadId) {
+                error_log('EmailThreads: forceCreateThreadForTesting - No lead ID');
+                return;
+            }
+            
+            // Create a thread with a simple subject for testing
+            $testSubject = 'Test Thread for ' . $email->getSubject();
+            error_log('EmailThreads: forceCreateThreadForTesting - Creating thread with subject: ' . $testSubject);
+            
+            // Check if a thread already exists for this lead and subject
+            $existingThread = $this->entityManager->getRepository(\MauticPlugin\MauticEmailThreadsBundle\Entity\EmailThread::class)
+                ->createQueryBuilder('t')
+                ->where('t.subject = :subject')
+                ->andWhere('t.lead = :leadId')
+                ->setParameter('subject', $testSubject)
+                ->setParameter('leadId', $leadId)
+                ->getQuery()
+                ->getOneOrNullResult();
+            
+            if ($existingThread) {
+                error_log('EmailThreads: forceCreateThreadForTesting - Using existing thread: ' . $existingThread->getId());
+                $thread = $existingThread;
+            } else {
+                // Create new thread
+                $thread = new \MauticPlugin\MauticEmailThreadsBundle\Entity\EmailThread();
+                
+                // Set lead
+                if (is_array($leadData)) {
+                    $leadRepository = $this->entityManager->getRepository(\Mautic\LeadBundle\Entity\Lead::class);
+                    $leadEntity = $leadRepository->find($leadId);
+                    if ($leadEntity) {
+                        $thread->setLead($leadEntity);
+                    }
+                } else {
+                    $thread->setLead($leadData);
+                }
+                
+                $thread->setSubject($testSubject);
+                $thread->setFromEmail($email->getFromAddress() ?: 'test@example.com');
+                $thread->setFromName($email->getFromName() ?: 'Test Sender');
+                $thread->setFirstMessageDate(new \DateTime());
+                $thread->setLastMessageDate(new \DateTime());
+                
+                $this->entityManager->persist($thread);
+                $this->entityManager->flush();
+                
+                error_log('EmailThreads: forceCreateThreadForTesting - Created new thread: ' . $thread->getId());
+            }
+            
+            // Create a message for this thread
+            $message = new \MauticPlugin\MauticEmailThreadsBundle\Entity\EmailThreadMessage();
+            $message->setThread($thread);
+            $message->setEmail($email);
+            $message->setSubject($email->getSubject());
+            $message->setContent($event->getContent() ?: 'Test message content');
+            $message->setFromEmail($email->getFromAddress() ?: 'test@example.com');
+            $message->setFromName($email->getFromName() ?: 'Test Sender');
+            $message->setDateSent(new \DateTime());
+            $message->setEmailType('test');
+            
+            $this->entityManager->persist($message);
+            $this->entityManager->flush();
+            
+            error_log('EmailThreads: forceCreateThreadForTesting - Created message: ' . $message->getId());
+            
+            // Now try to get existing messages and inject them
+            $existingMessages = $this->messageModel->getMessagesByThread($thread);
+            error_log('EmailThreads: forceCreateThreadForTesting - Found ' . count($existingMessages) . ' existing messages');
+            
+            if (count($existingMessages) > 1) { // More than just the current message
+                $threadContent = $this->generateThreadContentWithPrevious($existingMessages, $email, $event);
+                if (!empty($threadContent)) {
+                    $this->injectThreadContent($event, $threadContent, $thread);
+                    error_log('EmailThreads: forceCreateThreadForTesting - Injected thread content');
+                } else {
+                    error_log('EmailThreads: forceCreateThreadForTesting - No thread content generated');
+                }
+            } else {
+                error_log('EmailThreads: forceCreateThreadForTesting - Only one message in thread, no previous messages to show');
+            }
+            
+        } catch (\Exception $e) {
+            error_log('EmailThreads: forceCreateThreadForTesting - Error: ' . $e->getMessage());
         }
     }
 
