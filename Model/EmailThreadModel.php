@@ -164,24 +164,126 @@ class EmailThreadModel
 
     public function findByThreadId(string $threadId): ?EmailThread
     {
-        return $this->getRepository()->findByThreadId($threadId);
+        try {
+            return $this->getRepository()->findByThreadId($threadId);
+        } catch (\Exception $e) {
+            error_log('EmailThreads: findByThreadId repository method failed: ' . $e->getMessage() . ', using raw SQL fallback');
+            
+            // Fallback to raw SQL
+            try {
+                $connection = $this->em->getConnection();
+                $sql = 'SELECT * FROM email_threads WHERE thread_id = ? LIMIT 1';
+                $result = $connection->executeQuery($sql, [$threadId]);
+                $row = $result->fetchAssociative();
+                
+                if ($row) {
+                    $thread = $this->em->find(EmailThread::class, $row['id']);
+                    error_log('EmailThreads: Raw SQL fallback found thread with ID: ' . ($thread ? $thread->getId() : 'null'));
+                    return $thread;
+                }
+                
+                error_log('EmailThreads: Raw SQL fallback found no thread with thread_id: ' . $threadId);
+                return null;
+            } catch (\Exception $sqlException) {
+                error_log('EmailThreads: Raw SQL fallback also failed: ' . $sqlException->getMessage());
+                return null;
+            }
+        }
     }
 
     public function findByLead(Lead $lead): array
     {
-        return $this->getRepository()->findByLead($lead);
+        try {
+            return $this->getRepository()->findByLead($lead);
+        } catch (\Exception $e) {
+            error_log('EmailThreads: findByLead repository method failed: ' . $e->getMessage() . ', using raw SQL fallback');
+            
+            // Fallback to raw SQL
+            try {
+                $connection = $this->em->getConnection();
+                $sql = 'SELECT * FROM email_threads WHERE lead_id = ? ORDER BY last_message_date DESC';
+                $result = $connection->executeQuery($sql, [$lead->getId()]);
+                $threads = [];
+                
+                while ($row = $result->fetchAssociative()) {
+                    // Load the actual entity
+                    $thread = $this->em->find(EmailThread::class, $row['id']);
+                    if ($thread) {
+                        $threads[] = $thread;
+                    }
+                }
+                
+                error_log('EmailThreads: Raw SQL fallback found ' . count($threads) . ' threads for lead');
+                return $threads;
+            } catch (\Exception $sqlException) {
+                error_log('EmailThreads: Raw SQL fallback also failed: ' . $sqlException->getMessage());
+                return [];
+            }
+        }
     }
 
     public function findActiveThreads(): array
     {
-        return $this->getRepository()->findActiveThreads();
+        try {
+            return $this->getRepository()->findActiveThreads();
+        } catch (\Exception $e) {
+            error_log('EmailThreads: findActiveThreads repository method failed: ' . $e->getMessage() . ', using raw SQL fallback');
+            
+            // Fallback to raw SQL
+            try {
+                $connection = $this->em->getConnection();
+                $sql = 'SELECT * FROM email_threads WHERE is_active = 1 ORDER BY last_message_date DESC';
+                $result = $connection->executeQuery($sql);
+                $threads = [];
+                
+                while ($row = $result->fetchAssociative()) {
+                    // Load the actual entity
+                    $thread = $this->em->find(EmailThread::class, $row['id']);
+                    if ($thread) {
+                        $threads[] = $thread;
+                    }
+                }
+                
+                error_log('EmailThreads: Raw SQL fallback found ' . count($threads) . ' active threads');
+                return $threads;
+            } catch (\Exception $sqlException) {
+                error_log('EmailThreads: Raw SQL fallback also failed: ' . $sqlException->getMessage());
+                return [];
+            }
+        }
     }
 
     public function deactivateExpiredThreads(int $daysOld = 30): int
     {
-        $expiredThreads = $this->getRepository()->findExpiredThreads($daysOld);
+        try {
+            $expiredThreads = $this->getRepository()->findExpiredThreads($daysOld);
+        } catch (\Exception $e) {
+            error_log('EmailThreads: findExpiredThreads repository method failed: ' . $e->getMessage() . ', using raw SQL fallback');
+            
+            // Fallback to raw SQL
+            try {
+                $connection = $this->em->getConnection();
+                $expiredDate = date('Y-m-d H:i:s', strtotime("-{$daysOld} days"));
+                $sql = 'SELECT * FROM email_threads WHERE last_message_date < ?';
+                $result = $connection->executeQuery($sql, [$expiredDate]);
+                $expiredThreads = [];
+                
+                while ($row = $result->fetchAssociative()) {
+                    // Load the actual entity
+                    $thread = $this->em->find(EmailThread::class, $row['id']);
+                    if ($thread) {
+                        $expiredThreads[] = $thread;
+                    }
+                }
+                
+                error_log('EmailThreads: Raw SQL fallback found ' . count($expiredThreads) . ' expired threads');
+            } catch (\Exception $sqlException) {
+                error_log('EmailThreads: Raw SQL fallback also failed: ' . $sqlException->getMessage());
+                $expiredThreads = [];
+            }
+        }
+        
         $deactivatedCount = 0;
-
         foreach ($expiredThreads as $thread) {
             $thread->setIsActive(false);
             $this->saveEntity($thread);
