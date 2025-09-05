@@ -121,7 +121,11 @@ class EmailSubscriber implements EventSubscriberInterface
             error_log("EmailThreads: Thread ID: " . $thread->getThreadId() . ", Lead ID: " . $leadId);
             error_log('EmailThreads: Created/found thread: ' . $thread->getThreadId() . ' for lead: ' . $leadId);
             
-            // First add the current message to get all thread messages
+            // Get existing messages BEFORE adding the current message
+            $existingMessages = $this->messageModel->getMessagesByThread($thread);
+            error_log('EmailThreads: Existing messages in thread: ' . count($existingMessages));
+            
+            // Now add the current message to the thread
             $currentMessage = $this->messageModel->addMessageToThread($thread, $email, null, $event);
             if (!$currentMessage) {
                 error_log('EmailThreads: ERROR: Failed to add current message to thread');
@@ -129,29 +133,26 @@ class EmailSubscriber implements EventSubscriberInterface
             }
             error_log('EmailThreads: Added current message to thread');
             
-            // Now inject quoted content from previous messages
-            $allMessages = $this->messageModel->getMessagesByThread($thread);
-            error_log('EmailThreads: Total messages in thread now: ' . count($allMessages));
+            // Check if we should inject previous messages into the email
+            $injectPreviousMessages = $this->coreParametersHelper ? 
+                $this->coreParametersHelper->get('emailthreads_inject_previous_messages', true) : true;
             
-            if (empty($allMessages)) {
-                error_log('EmailThreads: WARNING: No messages found in thread after adding current message');
-            }
-            
-            // Generate thread content with quoted previous messages (exclude current message)
-            $previousMessages = array_slice($allMessages, 0, -1); // All except the last (current) message
-            error_log('EmailThreads: Previous messages for threading: ' . count($previousMessages));
-            
-            $threadContent = $this->generateThreadContentWithPrevious($previousMessages, $email, $event);
-            
-            // Debug logging
-            error_log("EmailThreads: Generated thread content length: " . strlen($threadContent));
-            
-            // Update email content with threaded conversation
-            if (!empty($threadContent)) {
-                $this->injectThreadContent($event, $threadContent, $thread);
-                error_log("EmailThreads: Injected thread content into email");
+            if ($injectPreviousMessages && !empty($existingMessages)) {
+                // Generate thread content with existing messages (previous messages only)
+                $threadContent = $this->generateThreadContentWithPrevious($existingMessages, $email, $event);
+                
+                // Debug logging
+                error_log("EmailThreads: Generated thread content length: " . strlen($threadContent));
+                
+                // Update email content with threaded conversation
+                if (!empty($threadContent)) {
+                    $this->injectThreadContent($event, $threadContent, $thread);
+                    error_log("EmailThreads: Injected thread content into email");
+                } else {
+                    error_log("EmailThreads: No thread content to inject (first message)");
+                }
             } else {
-                error_log("EmailThreads: No thread content to inject (first message)");
+                error_log("EmailThreads: Skipping thread content injection - injectPreviousMessages: " . ($injectPreviousMessages ? 'true' : 'false') . ", existingMessages: " . count($existingMessages));
             }
             
         } catch (\Exception $e) {
@@ -175,8 +176,8 @@ class EmailSubscriber implements EventSubscriberInterface
         
         error_log('EmailThreads: Generating thread content with ' . count($previousMessages) . ' previous messages');
         
-        $threadHtml = '<div class="email-thread-history" style="margin-top: 20px; border-top: 1px solid #ddd; padding-top: 15px;">';
-        $threadHtml .= '<h4 style="margin: 0 0 15px 0; font-size: 14px; color: #666;">Previous Messages:</h4>';
+        // Create a more Gmail/Outlook style thread separator
+        $threadHtml = '<div class="email-thread-history">';
         
         // Show previous messages in reverse order (most recent first)
         $reversedMessages = array_reverse($previousMessages);
@@ -199,23 +200,27 @@ class EmailSubscriber implements EventSubscriberInterface
             // Get and clean the content
             $quotedContent = $this->quoteMessageContent($content);
             
+            // Gmail/Outlook style quote block
             $threadHtml .= sprintf(
-                '<div class="previous-message" style="margin: 15px 0; border-left: 3px solid #007bff; padding-left: 15px; background: #f8f9fa; padding: 10px 10px 10px 15px;">
-                    <div class="message-header" style="font-size: 12px; color: #666; margin-bottom: 8px; font-weight: bold;">
-                        On %s, %s wrote:
+                '<div class="previous-message" style="margin: 20px 0; border-left: 2px solid #dadce0; padding-left: 20px; position: relative;">
+                    <div class="message-header" style="font-size: 13px; color: #5f6368; margin-bottom: 12px; font-weight: 500;">
+                        <span style="color: #1a73e8;">%s</span> wrote:
                     </div>
-                    <div class="quoted-content" style="font-size: 13px; color: #555; font-style: italic;">
+                    <div class="quoted-content" style="font-size: 14px; color: #3c4043; line-height: 1.5; background: #f8f9fa; padding: 12px; border-radius: 4px; border: 1px solid #e8eaed;">
+                        %s
+                    </div>
+                    <div style="font-size: 11px; color: #5f6368; margin-top: 8px;">
                         %s
                     </div>
                 </div>',
-                $messageDate,
                 htmlspecialchars($fromName),
-                $quotedContent
+                $quotedContent,
+                $messageDate
             );
         }
         
         if (count($previousMessages) > $maxMessages) {
-            $threadHtml .= '<div style="font-size: 12px; color: #999; text-align: center; margin: 10px 0;">... and ' . (count($previousMessages) - $maxMessages) . ' earlier messages</div>';
+            $threadHtml .= '<div style="font-size: 12px; color: #5f6368; text-align: center; margin: 15px 0; font-style: italic;">... and ' . (count($previousMessages) - $maxMessages) . ' earlier messages</div>';
         }
         
         $threadHtml .= '</div>';
@@ -275,6 +280,12 @@ class EmailSubscriber implements EventSubscriberInterface
         $textContent = preg_replace('/\s+/', ' ', $textContent);
         $textContent = trim($textContent);
         
+        // Remove common email signatures and footers
+        $textContent = preg_replace('/\n\s*--\s*\n.*$/s', '', $textContent);
+        $textContent = preg_replace('/\n\s*Best regards.*$/s', '', $textContent);
+        $textContent = preg_replace('/\n\s*Sincerely.*$/s', '', $textContent);
+        $textContent = preg_replace('/\n\s*Thanks.*$/s', '', $textContent);
+        
         // Break into sentences for better readability
         $sentences = preg_split('/(?<=[.!?])\s+/', $textContent);
         
@@ -288,12 +299,12 @@ class EmailSubscriber implements EventSubscriberInterface
         }
         
         // Limit overall length
-        if (strlen($textContent) > 200) {
-            $textContent = substr($textContent, 0, 200) . '...';
+        if (strlen($textContent) > 250) {
+            $textContent = substr($textContent, 0, 250) . '...';
         }
         
-        // Add quote styling
-        return '<em style="color: #666;">"' . htmlspecialchars($textContent) . '"</em>';
+        // Return clean text without extra styling (styling is handled in the parent container)
+        return htmlspecialchars($textContent);
     }
 
     /**
@@ -311,17 +322,17 @@ class EmailSubscriber implements EventSubscriberInterface
         
         // Create thread footer with conversation history only if there's actual thread content
         $threadFooter = sprintf(
-            '<div class="email-thread-container" style="margin-top: 20px; border-top: 2px solid #007bff; padding-top: 15px; background: #f8f9fa; padding: 15px; border-radius: 5px;">
-                <div class="thread-header" style="margin-bottom: 10px;">
-                    <h4 style="margin: 0; font-size: 14px; color: #007bff;">📧 Email Thread</h4>
-                    <p style="margin: 3px 0 0 0; font-size: 11px; color: #666;">
-                        <a href="%s" style="color: #007bff; text-decoration: none;">🔗 View full conversation online</a>
-                    </p>
+            '<div class="email-thread-container" style="margin-top: 30px; border-top: 1px solid #e1e5e9; padding-top: 20px;">
+                <div class="thread-header" style="margin-bottom: 15px;">
+                    <div style="font-size: 12px; color: #5f6368; margin-bottom: 15px; font-weight: 500;">--- Previous Messages ---</div>
                 </div>
                 %s
+                <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e1e5e9; text-align: center;">
+                    <a href="%s" style="color: #1a73e8; text-decoration: none; font-size: 12px;">View full conversation online</a>
+                </div>
             </div>',
-            $threadUrl,
-            $threadContent
+            $threadContent,
+            $threadUrl
         );
 
         // Append to email content

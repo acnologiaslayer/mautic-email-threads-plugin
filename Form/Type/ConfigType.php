@@ -63,6 +63,13 @@ class ConfigType extends AbstractType
                     'tooltip' => 'mautic.emailthreads.config.include_unsubscribe.tooltip',
                 ],
             ])
+            ->add('emailthreads_inject_previous_messages', CheckboxType::class, [
+                'label' => 'mautic.emailthreads.config.inject_previous_messages',
+                'required' => false,
+                'attr' => [
+                    'tooltip' => 'mautic.emailthreads.config.inject_previous_messages.tooltip',
+                ],
+            ])
             ->add('save', SubmitType::class, [
                 'label' => 'mautic.core.form.save',
                 'attr' => [

@@ -110,6 +110,7 @@ return [
         'emailthreads_auto_thread' => true,
         'emailthreads_thread_lifetime' => 30, // days
         'emailthreads_include_unsubscribe' => true,
+        'emailthreads_inject_previous_messages' => true, // Inject previous messages as quotes in emails
     ],
     
     'categories' => [
