@@ -106,6 +106,9 @@ class EmailSubscriber implements EventSubscriberInterface
     {
         error_log('EmailThreads: EmailSubscriber::onEmailSend called');
         
+        // Always add a simple test message to verify the plugin is working
+        $this->addSimpleTestMessage($event);
+        
         // Check database tables exist before processing
         $this->verifyDatabaseTables();
         
@@ -121,6 +124,32 @@ class EmailSubscriber implements EventSubscriberInterface
         
         // Force content modification as a last resort
         $this->forceContentModification($event);
+    }
+    
+    /**
+     * Add a simple test message to verify the plugin is working
+     */
+    private function addSimpleTestMessage(EmailSendEvent $event): void
+    {
+        try {
+            $content = $event->getContent();
+            if (!$content) {
+                error_log('EmailThreads: addSimpleTestMessage - No content to modify');
+                return;
+            }
+            
+            $testMessage = '<div style="margin: 20px 0; padding: 15px; background: #e3f2fd; border-left: 4px solid #2196f3; font-family: Arial, sans-serif;">
+                <strong style="color: #1976d2;">🔧 Email Threads Plugin Test</strong><br>
+                <span style="color: #424242; font-size: 14px;">This message confirms the Email Threads plugin is working. If you see this, the plugin is active and processing emails.</span>
+            </div>';
+            
+            $newContent = $content . $testMessage;
+            $event->setContent($newContent);
+            
+            error_log('EmailThreads: addSimpleTestMessage - Added simple test message to email');
+        } catch (\Exception $e) {
+            error_log('EmailThreads: addSimpleTestMessage - Error: ' . $e->getMessage());
+        }
     }
     
     /**
@@ -316,6 +345,15 @@ class EmailSubscriber implements EventSubscriberInterface
             $existingMessages = $this->messageModel->getMessagesByThread($thread);
             error_log('EmailThreads: Existing messages in thread: ' . count($existingMessages));
             
+            // Debug: Log details about existing messages
+            if (!empty($existingMessages)) {
+                foreach ($existingMessages as $index => $msg) {
+                    error_log('EmailThreads: Existing message ' . $index . ': Subject="' . $msg->getSubject() . '", Content length=' . strlen($msg->getContent()));
+                }
+            } else {
+                error_log('EmailThreads: No existing messages found in thread ' . $thread->getThreadId());
+            }
+            
             // Now add the current message to the thread
             $currentMessage = $this->messageModel->addMessageToThread($thread, $email, null, $event);
             if (!$currentMessage) {
@@ -478,6 +516,13 @@ class EmailSubscriber implements EventSubscriberInterface
         }
         
         error_log('EmailThreads: Generating thread content with ' . count($previousMessages) . ' previous messages');
+        
+        // Debug: Log each message being processed
+        foreach ($previousMessages as $index => $message) {
+            $subject = is_object($message) ? $message->getSubject() : $message->subject;
+            $contentLength = is_object($message) ? strlen($message->getContent()) : strlen($message->content);
+            error_log('EmailThreads: Processing message ' . $index . ': Subject="' . $subject . '", Content length=' . $contentLength);
+        }
         
         // Create a more Gmail/Outlook style thread separator
         $threadHtml = '<div class="email-thread-history">';
@@ -700,6 +745,16 @@ class EmailSubscriber implements EventSubscriberInterface
         } else {
             error_log('EmailThreads: modifyEmailContent - WARNING: Thread content not found in final content');
             error_log('EmailThreads: modifyEmailContent - Final content length: ' . strlen($finalContent));
+            error_log('EmailThreads: modifyEmailContent - Final content preview: ' . substr($finalContent, -200));
+        }
+        
+        // Additional debugging: Check if the event content was actually set
+        $eventContentAfter = $event->getContent();
+        error_log('EmailThreads: modifyEmailContent - Event content after modification: ' . strlen($eventContentAfter) . ' bytes');
+        if (strlen($eventContentAfter) > strlen($originalContent)) {
+            error_log('EmailThreads: modifyEmailContent - Content was extended by ' . (strlen($eventContentAfter) - strlen($originalContent)) . ' bytes');
+        } else {
+            error_log('EmailThreads: modifyEmailContent - Content was NOT extended - this indicates a problem!');
         }
     }
 
