@@ -33,30 +33,96 @@ class EmailSubscriber implements EventSubscriberInterface
         
         // Log constructor call
         error_log('EmailThreads: EmailSubscriber constructor called');
+        
+        // Log available EmailEvents constants for debugging
+        $this->logAvailableEmailEvents();
+    }
+    
+    /**
+     * Log available EmailEvents constants for debugging
+     */
+    private function logAvailableEmailEvents(): void
+    {
+        try {
+            $reflection = new \ReflectionClass(EmailEvents::class);
+            $constants = $reflection->getConstants();
+            error_log('EmailThreads: Available EmailEvents constants: ' . implode(', ', array_keys($constants)));
+        } catch (\Exception $e) {
+            error_log('EmailThreads: Could not get EmailEvents constants: ' . $e->getMessage());
+        }
     }
 
     public static function getSubscribedEvents(): array
     {
-        return [
-            EmailEvents::EMAIL_ON_SEND     => ['onEmailSend', 0],
-            EmailEvents::EMAIL_ON_DISPLAY  => ['onEmailDisplay', 0], 
-            EmailEvents::EMAIL_PRE_SEND    => ['onEmailPreSend', 0],
-            // Add more email events to catch all possibilities including campaigns
-            'mautic.email_on_send'         => ['onEmailSend', 0],
-            'mautic.email_pre_send'        => ['onEmailPreSend', 0],
-            'mautic.campaign_on_trigger'   => ['onCampaignTrigger', 0],
-            // Campaign events that might be used for segment emails
-            'mautic.campaign.on_event_trigger' => ['onCampaignEventTrigger', 0],
-        ];
+        $events = [];
+        
+        // Try to get available EmailEvents constants
+        try {
+            $reflection = new \ReflectionClass(EmailEvents::class);
+            $constants = $reflection->getConstants();
+            
+            // Use EMAIL_SEND if available (Mautic 5+)
+            if (isset($constants['EMAIL_SEND'])) {
+                $events[EmailEvents::EMAIL_SEND] = ['onEmailSend', 100];
+                error_log('EmailThreads: Using EMAIL_SEND event');
+            }
+            
+            // Use EMAIL_ON_SEND if available (Mautic 4+)
+            if (isset($constants['EMAIL_ON_SEND'])) {
+                $events[EmailEvents::EMAIL_ON_SEND] = ['onEmailSend', 50];
+                error_log('EmailThreads: Using EMAIL_ON_SEND event');
+            }
+            
+            // Use EMAIL_ON_DISPLAY if available
+            if (isset($constants['EMAIL_ON_DISPLAY'])) {
+                $events[EmailEvents::EMAIL_ON_DISPLAY] = ['onEmailDisplay', 0];
+            }
+            
+        } catch (\Exception $e) {
+            error_log('EmailThreads: Could not get EmailEvents constants, using fallback events');
+        }
+        
+        // Fallback to string-based event names for compatibility
+        $events['mautic.email_send'] = ['onEmailSend', 100];
+        $events['mautic.email_on_send'] = ['onEmailSend', 50];
+        $events['mautic.campaign_on_trigger'] = ['onCampaignTrigger', 0];
+        $events['mautic.campaign.on_event_trigger'] = ['onCampaignEventTrigger', 0];
+        
+        return $events;
     }
 
     public function onEmailSend(EmailSendEvent $event): void
     {
+        error_log('EmailThreads: EmailSubscriber::onEmailSend called');
+        
+        // Check if content was already modified (contains our thread content)
+        $content = $event->getContent();
+        if ($content && strpos($content, 'email-thread-container') !== false) {
+            error_log('EmailThreads: onEmailSend - Thread content already present, skipping');
+            return;
+        }
+        
+        // Process email threading
+        $this->processEmailThreading($event);
+    }
+
+    /**
+     * Main method for processing email threading
+     */
+    private function processEmailThreading(EmailSendEvent $event): void
+    {
+        // Check if content was already modified (contains our thread content)
+        $content = $event->getContent();
+        if ($content && strpos($content, 'email-thread-container') !== false) {
+            error_log('EmailThreads: processEmailThreading - Thread content already present, skipping');
+            return;
+        }
+        
         // Enhanced logging to debug segment emails
         $email = $event->getEmail();
         $leadData = $event->getLead();
         
-        error_log('EmailThreads: EmailSubscriber::onEmailSend called');
+        error_log('EmailThreads: processEmailThreading called');
         error_log('EmailThreads: Email type: ' . ($email ? $email->getEmailType() : 'null'));
         error_log('EmailThreads: Email subject: ' . ($email ? $email->getSubject() : 'null'));
         error_log('EmailThreads: Lead data type: ' . (is_array($leadData) ? 'array' : (is_object($leadData) ? get_class($leadData) : gettype($leadData))));
@@ -67,7 +133,7 @@ class EmailSubscriber implements EventSubscriberInterface
             return;
         }
         
-        // For debugging - temporarily disable the enabled check
+        // Check if plugin is enabled
         $isEnabled = $this->coreParametersHelper ? $this->coreParametersHelper->get('emailthreads_enabled', true) : true;
         error_log("EmailThreads: Plugin enabled check: " . ($isEnabled ? 'true' : 'false'));
         
@@ -76,12 +142,6 @@ class EmailSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $leadData = $event->getLead();
-        $email = $event->getEmail();
-        
-        error_log("EmailThreads: Processing email send event - Email ID: " . ($email ? $email->getId() : 'null'));
-        error_log('EmailThreads: Processing email ID: ' . ($email ? $email->getId() : 'null'));
-        
         if (!$leadData || !$email) {
             error_log("EmailThreads: Missing lead data or email, skipping");
             return;
@@ -314,11 +374,16 @@ class EmailSubscriber implements EventSubscriberInterface
     {
         $content = $event->getContent();
         if (!$content || empty($threadContent)) {
+            error_log('EmailThreads: injectThreadContent - No content or thread content to inject');
             return; // No content or no thread history to add
         }
 
+        error_log('EmailThreads: injectThreadContent - Original content length: ' . strlen($content));
+        error_log('EmailThreads: injectThreadContent - Thread content length: ' . strlen($threadContent));
+
         // Generate thread URL
         $threadUrl = $this->generateThreadUrl($thread->getThreadId());
+        error_log('EmailThreads: injectThreadContent - Thread URL: ' . $threadUrl);
         
         // Create thread footer with conversation history only if there's actual thread content
         $threadFooter = sprintf(
@@ -335,8 +400,14 @@ class EmailSubscriber implements EventSubscriberInterface
             $threadUrl
         );
 
+        error_log('EmailThreads: injectThreadContent - Thread footer length: ' . strlen($threadFooter));
+
         // Append to email content
-        $event->setContent($content . $threadFooter);
+        $newContent = $content . $threadFooter;
+        $event->setContent($newContent);
+        
+        error_log('EmailThreads: injectThreadContent - New content length: ' . strlen($newContent));
+        error_log('EmailThreads: injectThreadContent - Content successfully updated');
     }
 
     /**
@@ -349,15 +420,6 @@ class EmailSubscriber implements EventSubscriberInterface
         // Implementation can be added later if needed
     }
 
-    /**
-     * Handle pre-send events (for additional processing before send)
-     */
-    public function onEmailPreSend($event): void
-    {
-        error_log('EmailThreads: EmailSubscriber::onEmailPreSend called');
-        // This can be used for additional pre-processing
-        // Implementation can be added later if needed
-    }
 
     /**
      * Handle campaign trigger events (for segment emails)
