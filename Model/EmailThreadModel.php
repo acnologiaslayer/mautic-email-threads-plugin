@@ -126,6 +126,9 @@ class EmailThreadModel
         $this->saveEntity($thread);
         error_log('EmailThreads: Successfully created new thread: ' . $thread->getThreadId());
         
+        // Verify the thread was actually saved to database
+        $this->verifyThreadSaved($thread);
+        
         return $thread;
     }
 
@@ -165,6 +168,33 @@ class EmailThreadModel
         $subject = trim($subject);
         
         return $subject;
+    }
+
+    /**
+     * Verify that a thread was actually saved to the database
+     */
+    private function verifyThreadSaved(EmailThread $thread): void
+    {
+        try {
+            // Try to retrieve the thread from database
+            $savedThread = $this->getRepository()->find($thread->getId());
+            if ($savedThread) {
+                error_log('EmailThreads: VERIFIED - Thread saved to database successfully. ID: ' . $thread->getId() . ', ThreadID: ' . $thread->getThreadId());
+            } else {
+                error_log('EmailThreads: ERROR - Thread NOT found in database after save. ID: ' . $thread->getId());
+            }
+            
+            // Also try to find by threadId
+            $threadById = $this->getRepository()->findByThreadId($thread->getThreadId());
+            if ($threadById) {
+                error_log('EmailThreads: VERIFIED - Thread found by threadId: ' . $thread->getThreadId());
+            } else {
+                error_log('EmailThreads: ERROR - Thread NOT found by threadId: ' . $thread->getThreadId());
+            }
+            
+        } catch (\Exception $e) {
+            error_log('EmailThreads: ERROR - Failed to verify thread save: ' . $e->getMessage());
+        }
     }
 
     protected function dispatchEvent($action, &$entity, $isNew = false, \Symfony\Component\EventDispatcher\Event $event = null)

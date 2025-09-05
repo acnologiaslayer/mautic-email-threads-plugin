@@ -74,6 +74,9 @@ class EmailThreadMessageModel
 
         $this->saveEntity($message);
         
+        // Verify the message was actually saved to database
+        $this->verifyMessageSaved($message);
+        
         // Update thread
         $thread->addMessage($message);
         $thread->setLastMessageDate($message->getDateSent());
@@ -259,6 +262,38 @@ class EmailThreadMessageModel
         
         // Default fallback
         return 'direct_send';
+    }
+
+    /**
+     * Verify that a message was actually saved to the database
+     */
+    private function verifyMessageSaved(EmailThreadMessage $message): void
+    {
+        try {
+            // Try to retrieve the message from database
+            $savedMessage = $this->getRepository()->find($message->getId());
+            if ($savedMessage) {
+                error_log('EmailThreads: VERIFIED - Message saved to database successfully. ID: ' . $message->getId() . ', Thread ID: ' . $message->getThread()->getId());
+            } else {
+                error_log('EmailThreads: ERROR - Message NOT found in database after save. ID: ' . $message->getId());
+            }
+            
+            // Also verify the message count in the thread
+            $thread = $message->getThread();
+            if ($thread) {
+                $messageCount = $this->getRepository()->createQueryBuilder('m')
+                    ->select('COUNT(m.id)')
+                    ->where('m.thread = :thread')
+                    ->setParameter('thread', $thread)
+                    ->getQuery()
+                    ->getSingleScalarResult();
+                    
+                error_log('EmailThreads: Thread ' . $thread->getId() . ' now has ' . $messageCount . ' messages');
+            }
+            
+        } catch (\Exception $e) {
+            error_log('EmailThreads: ERROR - Failed to verify message save: ' . $e->getMessage());
+        }
     }
 
     protected function dispatchEvent($action, &$entity, $isNew = false, \Symfony\Component\EventDispatcher\Event $event = null)

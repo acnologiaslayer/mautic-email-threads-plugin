@@ -102,6 +102,9 @@ class EmailSubscriber implements EventSubscriberInterface
     {
         error_log('EmailThreads: EmailSubscriber::onEmailSend called');
         
+        // Check database tables exist before processing
+        $this->verifyDatabaseTables();
+        
         // Check if content was already modified (contains our thread content)
         $content = $event->getContent();
         if ($content && strpos($content, 'email-thread-container') !== false) {
@@ -183,6 +186,45 @@ class EmailSubscriber implements EventSubscriberInterface
             
         } catch (\Exception $e) {
             error_log('EmailThreads: forceContentModification - Error: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Verify that database tables exist and are accessible
+     */
+    private function verifyDatabaseTables(): void
+    {
+        try {
+            $connection = $this->entityManager->getConnection();
+            
+            // Check if email_threads table exists
+            $threadsTableExists = $connection->executeQuery("SHOW TABLES LIKE 'email_threads'")->rowCount() > 0;
+            error_log('EmailThreads: Database check - email_threads table exists: ' . ($threadsTableExists ? 'YES' : 'NO'));
+            
+            // Check if email_thread_messages table exists
+            $messagesTableExists = $connection->executeQuery("SHOW TABLES LIKE 'email_thread_messages'")->rowCount() > 0;
+            error_log('EmailThreads: Database check - email_thread_messages table exists: ' . ($messagesTableExists ? 'YES' : 'NO'));
+            
+            if (!$threadsTableExists || !$messagesTableExists) {
+                error_log('EmailThreads: ERROR - Required database tables are missing! Plugin may not work correctly.');
+                error_log('EmailThreads: Please install/upgrade the plugin through Mautic admin to create the tables.');
+            } else {
+                // Check table structure
+                $threadsColumns = $connection->executeQuery("DESCRIBE email_threads")->fetchAllAssociative();
+                $messagesColumns = $connection->executeQuery("DESCRIBE email_thread_messages")->fetchAllAssociative();
+                
+                error_log('EmailThreads: email_threads table has ' . count($threadsColumns) . ' columns');
+                error_log('EmailThreads: email_thread_messages table has ' . count($messagesColumns) . ' columns');
+                
+                // Check if we can query the tables
+                $threadCount = $connection->executeQuery("SELECT COUNT(*) FROM email_threads")->fetchOne();
+                $messageCount = $connection->executeQuery("SELECT COUNT(*) FROM email_thread_messages")->fetchOne();
+                
+                error_log('EmailThreads: Current database state - Threads: ' . $threadCount . ', Messages: ' . $messageCount);
+            }
+            
+        } catch (\Exception $e) {
+            error_log('EmailThreads: ERROR - Database verification failed: ' . $e->getMessage());
         }
     }
 
@@ -296,6 +338,9 @@ class EmailSubscriber implements EventSubscriberInterface
             
             // Add a simple test message to verify the plugin is working
             $this->addTestMessage($event);
+            
+            // Also create a test thread to verify database functionality
+            $this->createTestThread($event);
         }
             
         } catch (\Exception $e) {
@@ -326,6 +371,83 @@ class EmailSubscriber implements EventSubscriberInterface
             error_log('EmailThreads: addTestMessage - Added test message to email');
         } catch (\Exception $e) {
             error_log('EmailThreads: addTestMessage - Error: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Create a test thread to verify database functionality
+     */
+    private function createTestThread(EmailSendEvent $event): void
+    {
+        try {
+            $email = $event->getEmail();
+            $leadData = $event->getLead();
+            
+            if (!$email || !$leadData) {
+                error_log('EmailThreads: createTestThread - Missing email or lead data');
+                return;
+            }
+            
+            // Create a test thread with a unique subject
+            $testSubject = 'TEST_THREAD_' . date('Y-m-d_H-i-s') . '_' . uniqid();
+            error_log('EmailThreads: createTestThread - Creating test thread with subject: ' . $testSubject);
+            
+            // Create a test thread
+            $testThread = new \MauticPlugin\MauticEmailThreadsBundle\Entity\EmailThread();
+            
+            // Set lead
+            if (is_array($leadData)) {
+                $leadId = $leadData['id'] ?? null;
+                if ($leadId) {
+                    $leadRepository = $this->entityManager->getRepository(\Mautic\LeadBundle\Entity\Lead::class);
+                    $leadEntity = $leadRepository->find($leadId);
+                    if ($leadEntity) {
+                        $testThread->setLead($leadEntity);
+                    }
+                }
+            } else {
+                $testThread->setLead($leadData);
+            }
+            
+            $testThread->setSubject($testSubject);
+            $testThread->setFromEmail($email->getFromAddress() ?: 'test@example.com');
+            $testThread->setFromName($email->getFromName() ?: 'Test Sender');
+            $testThread->setFirstMessageDate(new \DateTime());
+            $testThread->setLastMessageDate(new \DateTime());
+            
+            $this->entityManager->persist($testThread);
+            $this->entityManager->flush();
+            
+            error_log('EmailThreads: createTestThread - Test thread created with ID: ' . $testThread->getId());
+            
+            // Create a test message
+            $testMessage = new \MauticPlugin\MauticEmailThreadsBundle\Entity\EmailThreadMessage();
+            $testMessage->setThread($testThread);
+            $testMessage->setEmail($email);
+            $testMessage->setSubject($testSubject);
+            $testMessage->setContent('This is a test message to verify database functionality.');
+            $testMessage->setFromEmail($email->getFromAddress() ?: 'test@example.com');
+            $testMessage->setFromName($email->getFromName() ?: 'Test Sender');
+            $testMessage->setDateSent(new \DateTime());
+            $testMessage->setEmailType('test');
+            
+            $this->entityManager->persist($testMessage);
+            $this->entityManager->flush();
+            
+            error_log('EmailThreads: createTestThread - Test message created with ID: ' . $testMessage->getId());
+            
+            // Verify the test data was saved
+            $savedThread = $this->entityManager->getRepository(\MauticPlugin\MauticEmailThreadsBundle\Entity\EmailThread::class)->find($testThread->getId());
+            $savedMessage = $this->entityManager->getRepository(\MauticPlugin\MauticEmailThreadsBundle\Entity\EmailThreadMessage::class)->find($testMessage->getId());
+            
+            if ($savedThread && $savedMessage) {
+                error_log('EmailThreads: createTestThread - SUCCESS: Test thread and message verified in database');
+            } else {
+                error_log('EmailThreads: createTestThread - ERROR: Test thread or message not found in database');
+            }
+            
+        } catch (\Exception $e) {
+            error_log('EmailThreads: createTestThread - Error: ' . $e->getMessage());
         }
     }
 
