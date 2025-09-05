@@ -27,7 +27,7 @@ class PublicController extends AbstractFormController
 
         $messages = $this->messageModel->getMessagesByThread($thread);
 
-        return $this->render('@MauticEmailThreads/Public/thread.html.twig', [
+        return $this->render('MauticEmailThreadsBundle:Public:thread.html.twig', [
             'thread' => $thread,
             'messages' => $messages,
         ]);
@@ -43,7 +43,7 @@ class PublicController extends AbstractFormController
 
         $messages = $this->messageModel->getMessagesByThread($thread);
 
-        $response = $this->render('@MauticEmailThreads/Public/thread_embed.html.twig', [
+        $response = $this->render('MauticEmailThreadsBundle:Public:thread_embed.html.twig', [
             'thread' => $thread,
             'messages' => $messages,
         ]);

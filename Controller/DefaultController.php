@@ -41,7 +41,7 @@ class DefaultController extends AbstractStandardFormController
             // Get all active threads
             $threads = $this->threadModel->findActiveThreads();
             
-            return $this->render('@MauticEmailThreads/Default/index.html.twig', [
+            return $this->render('MauticEmailThreadsBundle:Default:index.html.twig', [
                 'threads' => $threads,
             ]);
         } catch (\Exception $e) {
@@ -70,7 +70,7 @@ class DefaultController extends AbstractStandardFormController
             throw $this->createNotFoundException('Thread not found');
         }
 
-        return $this->render('@MauticEmailThreads/Default/view.html.twig', [
+        return $this->render('MauticEmailThreadsBundle:Default:view.html.twig', [
             'thread' => $thread,
         ]);
     }
@@ -105,7 +105,7 @@ class DefaultController extends AbstractStandardFormController
             }
         }
 
-        return $this->render('@MauticEmailThreads/Config/form.html.twig', [
+        return $this->render('MauticEmailThreadsBundle:Config:form.html.twig', [
             'form' => $form->createView(),
         ]);
     }
