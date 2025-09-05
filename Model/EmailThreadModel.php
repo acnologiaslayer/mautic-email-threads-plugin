@@ -67,24 +67,54 @@ class EmailThreadModel
         } catch (\Exception $e) {
             // Fallback to basic doctrine query if custom repository method fails
             error_log('EmailThreads: Custom repository failed: ' . $e->getMessage() . ', using fallback');
-            $existingThreads = $this->em->createQueryBuilder()
-                ->select('t')
-                ->from(EmailThread::class, 't')
-                ->where('t.subject = :subject')
-                ->andWhere('t.lead = :leadId')
-                ->setParameter('subject', $subject)
-                ->setParameter('leadId', $leadId)
-                ->getQuery()
-                ->getResult();
-            error_log('EmailThreads: Fallback query found ' . count($existingThreads) . ' threads');
+            
+            // Try to use raw SQL as a last resort
+            try {
+                $connection = $this->em->getConnection();
+                $sql = 'SELECT * FROM email_threads WHERE lead_id = ?';
+                $result = $connection->executeQuery($sql, [$leadId]);
+                $existingThreads = [];
+                
+                while ($row = $result->fetchAssociative()) {
+                    // Create a simple object with the data we need
+                    $thread = new \stdClass();
+                    $thread->id = $row['id'];
+                    $thread->threadId = $row['thread_id'];
+                    $thread->subject = $row['subject'] ?? 'Unknown Subject';
+                    $thread->leadId = $row['lead_id'];
+                    $existingThreads[] = $thread;
+                }
+                
+                error_log('EmailThreads: Raw SQL fallback found ' . count($existingThreads) . ' threads');
+            } catch (\Exception $sqlException) {
+                error_log('EmailThreads: Raw SQL fallback also failed: ' . $sqlException->getMessage());
+                $existingThreads = [];
+            }
         }
         
         if (!empty($existingThreads)) {
-            $thread = $existingThreads[0]; // Use the first matching thread
-            $thread->setLastMessageDate(new \DateTime());
-            $this->saveEntity($thread);
-            error_log('EmailThreads: Using existing thread: ' . $thread->getThreadId());
-            return $thread;
+            $existingThread = $existingThreads[0];
+            
+            // Handle both entity objects and stdClass objects from raw SQL
+            if ($existingThread instanceof EmailThread) {
+                $thread = $existingThread;
+                $thread->setLastMessageDate(new \DateTime());
+                $this->saveEntity($thread);
+                error_log('EmailThreads: Using existing thread: ' . $thread->getThreadId());
+                return $thread;
+            } else {
+                // This is a stdClass from raw SQL, we need to load the actual entity
+                $threadId = $existingThread->id;
+                $thread = $this->em->find(EmailThread::class, $threadId);
+                if ($thread) {
+                    $thread->setLastMessageDate(new \DateTime());
+                    $this->saveEntity($thread);
+                    error_log('EmailThreads: Using existing thread from raw SQL: ' . $thread->getThreadId());
+                    return $thread;
+                } else {
+                    error_log('EmailThreads: Could not load thread entity with ID: ' . $threadId);
+                }
+            }
         }
 
         error_log('EmailThreads: Creating new thread for subject: ' . $subject);

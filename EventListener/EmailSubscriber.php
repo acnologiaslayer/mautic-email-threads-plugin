@@ -576,15 +576,16 @@ class EmailSubscriber implements EventSubscriberInterface
             $testSubject = 'Test Thread for ' . $email->getSubject();
             error_log('EmailThreads: forceCreateThreadForTesting - Creating thread with subject: ' . $testSubject);
             
-            // Check if a thread already exists for this lead and subject
-            $existingThread = $this->entityManager->getRepository(\MauticPlugin\MauticEmailThreadsBundle\Entity\EmailThread::class)
-                ->createQueryBuilder('t')
-                ->where('t.subject = :subject')
-                ->andWhere('t.lead = :leadId')
-                ->setParameter('subject', $testSubject)
-                ->setParameter('leadId', $leadId)
-                ->getQuery()
-                ->getOneOrNullResult();
+            // Check if a thread already exists for this lead and subject using raw SQL
+            $connection = $this->entityManager->getConnection();
+            $sql = 'SELECT * FROM email_threads WHERE lead_id = ? AND subject = ? LIMIT 1';
+            $result = $connection->executeQuery($sql, [$leadId, $testSubject]);
+            $row = $result->fetchAssociative();
+            
+            $existingThread = null;
+            if ($row) {
+                $existingThread = $this->entityManager->find(\MauticPlugin\MauticEmailThreadsBundle\Entity\EmailThread::class, $row['id']);
+            }
             
             if ($existingThread) {
                 error_log('EmailThreads: forceCreateThreadForTesting - Using existing thread: ' . $existingThread->getId());
