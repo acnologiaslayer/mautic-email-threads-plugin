@@ -64,6 +64,7 @@ return [
                     'mautic.emailthreads.model.message',
                     'mautic.helper.core_parameters',
                     'router',
+                    'doctrine.orm.entity_manager',
                 ],
                 'tags' => ['kernel.event_subscriber'],
             ],

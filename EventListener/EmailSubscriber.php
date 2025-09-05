@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MauticPlugin\MauticEmailThreadsBundle\EventListener;
 
+use Doctrine\ORM\EntityManagerInterface;
 use Mautic\CoreBundle\Helper\CoreParametersHelper;
 use Mautic\EmailBundle\EmailEvents;
 use Mautic\EmailBundle\Event\EmailSendEvent;
@@ -19,17 +20,20 @@ class EmailSubscriber implements EventSubscriberInterface
     private $messageModel;
     private $coreParametersHelper;
     private $router;
+    private $entityManager;
 
     public function __construct(
         $threadModel = null,
         $messageModel = null,
         $coreParametersHelper = null,
-        $router = null
+        $router = null,
+        EntityManagerInterface $entityManager = null
     ) {
         $this->threadModel = $threadModel;
         $this->messageModel = $messageModel;
         $this->coreParametersHelper = $coreParametersHelper;
         $this->router = $router;
+        $this->entityManager = $entityManager;
         
         // Log constructor call
         error_log('EmailThreads: EmailSubscriber constructor called');
@@ -195,6 +199,11 @@ class EmailSubscriber implements EventSubscriberInterface
     private function verifyDatabaseTables(): void
     {
         try {
+            if (!$this->entityManager) {
+                error_log('EmailThreads: ERROR - EntityManager not available, skipping database verification');
+                return;
+            }
+            
             $connection = $this->entityManager->getConnection();
             
             // Check if email_threads table exists
@@ -380,6 +389,11 @@ class EmailSubscriber implements EventSubscriberInterface
     private function createTestThread(EmailSendEvent $event): void
     {
         try {
+            if (!$this->entityManager) {
+                error_log('EmailThreads: createTestThread - EntityManager not available, skipping test thread creation');
+                return;
+            }
+            
             $email = $event->getEmail();
             $leadData = $event->getLead();
             
