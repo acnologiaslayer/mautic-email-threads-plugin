@@ -8,10 +8,10 @@
 
 // Check if we're in Mautic root or docroot
 $bootstrapPath = null;
-if (file_exists('app/bootstrap.php')) {
-    $bootstrapPath = 'app/bootstrap.php';
-} elseif (file_exists('../app/bootstrap.php')) {
-    $bootstrapPath = '../app/bootstrap.php';
+if (file_exists('app/config/bootstrap.php')) {
+    $bootstrapPath = 'app/config/bootstrap.php';
+} elseif (file_exists('../app/config/bootstrap.php')) {
+    $bootstrapPath = '../app/config/bootstrap.php';
 } else {
     die("Error: This script must be run from the Mautic root directory or docroot.\n");
 }

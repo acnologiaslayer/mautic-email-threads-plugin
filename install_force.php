@@ -1,48 +1,72 @@
 <?php
 /**
- * Install EmailThreads Plugin - Works from anywhere
+ * Force Installation Script - Works from anywhere
  * 
- * This script automatically finds Mautic and installs the plugin
+ * This script will find Mautic and install the plugin no matter what
  */
 
-// Find Mautic installation by looking for bootstrap.php
+echo "🔍 Searching for Mautic installation...\n";
+
+// Try to find Mautic by looking for common files
 $mauticRoot = null;
-$searchPaths = [
-    __DIR__,
-    __DIR__ . '/..',
-    __DIR__ . '/../..',
+$possiblePaths = [
     '/var/www/html',
     '/var/www/html/docroot',
     getcwd(),
-    getcwd() . '/..',
-    getcwd() . '/../..'
+    __DIR__,
+    __DIR__ . '/..',
+    __DIR__ . '/../..',
+    __DIR__ . '/../../..',
 ];
 
-foreach ($searchPaths as $path) {
-    if (file_exists($path . '/app/config/bootstrap.php')) {
+foreach ($possiblePaths as $path) {
+    echo "Checking: $path\n";
+    
+    // Check for bootstrap.php
+    if (file_exists($path . '/app/bootstrap.php')) {
         $mauticRoot = $path;
+        echo "✅ Found Mautic at: $mauticRoot\n";
         break;
+    }
+    
+    // Check for composer.json (Mautic indicator)
+    if (file_exists($path . '/composer.json')) {
+        $content = file_get_contents($path . '/composer.json');
+        if (strpos($content, 'mautic/core-bundle') !== false) {
+            $mauticRoot = $path;
+            echo "✅ Found Mautic via composer.json at: $mauticRoot\n";
+            break;
+        }
     }
 }
 
 if (!$mauticRoot) {
-    die("Error: Could not find Mautic installation. Please ensure you're in a Mautic directory.\n");
+    echo "❌ Could not find Mautic installation automatically.\n";
+    echo "Please specify the Mautic root directory:\n";
+    echo "Usage: php install_force.php /path/to/mautic\n";
+    
+    if (isset($argv[1])) {
+        $mauticRoot = $argv[1];
+        if (!file_exists($mauticRoot . '/app/bootstrap.php')) {
+            die("❌ Invalid Mautic directory: $mauticRoot\n");
+        }
+    } else {
+        exit(1);
+    }
 }
 
-echo "Found Mautic at: $mauticRoot\n";
+echo "🚀 Installing EmailThreads Plugin...\n";
 
 // Load Mautic
-require_once $mauticRoot . '/app/config/bootstrap.php';
+require_once $mauticRoot . '/app/bootstrap.php';
 
 try {
-    echo "Installing EmailThreads Plugin...\n";
-    
     $container = \Mautic\CoreBundle\Factory\MauticFactory::getContainer();
     $connection = $container->get('doctrine.orm.entity_manager')->getConnection();
     
-    // Create tables
-    echo "Creating database tables...\n";
+    echo "📊 Creating database tables...\n";
     
+    // Create EmailThread table
     $connection->executeStatement("
         CREATE TABLE IF NOT EXISTS `mt_EmailThread` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -67,7 +91,9 @@ try {
             KEY `thread_subject_lead_idx` (`subject`, `lead_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+    echo "✅ Created mt_EmailThread table\n";
     
+    // Create EmailThreadMessage table
     $connection->executeStatement("
         CREATE TABLE IF NOT EXISTS `mt_EmailThreadMessage` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -91,8 +117,10 @@ try {
             CONSTRAINT `FK_EmailThreadMessage_thread` FOREIGN KEY (`thread_id`) REFERENCES `mt_EmailThread` (`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+    echo "✅ Created mt_EmailThreadMessage table\n";
     
-    // Insert config
+    // Insert configuration
+    echo "⚙️  Inserting configuration...\n";
     $configs = [
         ['emailthreads_enabled', '1'],
         ['emailthreads_domain', ''],
@@ -105,9 +133,15 @@ try {
     foreach ($configs as $config) {
         $connection->executeStatement("INSERT IGNORE INTO mt_config (param, value) VALUES (?, ?)", $config);
     }
+    echo "✅ Configuration inserted\n";
     
-    echo "✅ Installation complete! Clear cache and restart.\n";
+    echo "\n🎉 Installation complete!\n";
+    echo "Next steps:\n";
+    echo "1. Clear cache: php $mauticRoot/app/console cache:clear --env=prod\n";
+    echo "2. Restart your web server/container\n";
+    echo "3. Go to Mautic admin → Email Threads\n";
     
 } catch (Exception $e) {
-    echo "❌ Error: " . $e->getMessage() . "\n";
+    echo "❌ Installation failed: " . $e->getMessage() . "\n";
+    echo "Stack trace:\n" . $e->getTraceAsString() . "\n";
 }

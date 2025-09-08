@@ -7,12 +7,12 @@
  */
 
 // Check if we're in the right location
-if (!file_exists('app/bootstrap.php')) {
-    die("Error: This script must be run from a directory containing app/bootstrap.php.\n");
+if (!file_exists('app/config/bootstrap.php')) {
+    die("Error: This script must be run from a directory containing app/config/bootstrap.php.\n");
 }
 
 // Load Mautic
-require_once 'app/bootstrap.php';
+require_once 'app/config/bootstrap.php';
 
 try {
     echo "Installing EmailThreads Plugin...\n";

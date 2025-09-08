@@ -10,15 +10,15 @@ $mauticRoot = null;
 $currentDir = __DIR__;
 
 // Check current directory
-if (file_exists($currentDir . '/app/bootstrap.php')) {
+if (file_exists($currentDir . '/app/config/bootstrap.php')) {
     $mauticRoot = $currentDir;
 }
 // Check parent directory
-elseif (file_exists($currentDir . '/../app/bootstrap.php')) {
+elseif (file_exists($currentDir . '/../app/config/bootstrap.php')) {
     $mauticRoot = $currentDir . '/..';
 }
 // Check if we're in docroot
-elseif (file_exists($currentDir . '/../docroot/app/bootstrap.php')) {
+elseif (file_exists($currentDir . '/../docroot/app/config/bootstrap.php')) {
     $mauticRoot = $currentDir . '/../docroot';
 }
 
@@ -29,7 +29,7 @@ if (!$mauticRoot) {
 echo "Found Mautic installation at: $mauticRoot\n";
 
 // Load Mautic
-require_once $mauticRoot . '/app/bootstrap.php';
+require_once $mauticRoot . '/app/config/bootstrap.php';
 
 try {
     echo "Installing EmailThreads Plugin...\n";
