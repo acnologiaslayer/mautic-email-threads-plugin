@@ -59,20 +59,7 @@ return [
         'events' => [
                'mautic.emailthreads.subscriber.email' => [
                    'class'     => \MauticPlugin\MauticEmailThreadsBundle\EventListener\EmailSubscriberMinimal::class,
-                'arguments' => [
-                    'mautic.emailthreads.model.thread',
-                    'mautic.emailthreads.model.message',
-                    'mautic.helper.core_parameters',
-                    'router',
-                    'doctrine.orm.entity_manager',
-                ],
-                'tags' => ['kernel.event_subscriber'],
-            ],
-            'mautic.emailthreads.subscriber.install' => [
-                'class'     => \MauticPlugin\MauticEmailThreadsBundle\EventListener\InstallSubscriber::class,
-                'arguments' => [
-                    'doctrine.orm.entity_manager',
-                ],
+                'arguments' => [],
                 'tags' => ['kernel.event_subscriber'],
             ],
         ],
