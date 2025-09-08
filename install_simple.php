@@ -1,18 +1,35 @@
 <?php
 /**
- * Simple Docker Installation Script for EmailThreads Plugin
+ * Ultra-Simple Installation Script for EmailThreads Plugin
  * 
- * This script is designed to work specifically with Docker Mautic installations
- * where the script is run from /var/www/html/docroot
+ * This script works from any location and finds the Mautic installation automatically
  */
 
-// Check if we're in the right location
-if (!file_exists('app/bootstrap.php')) {
-    die("Error: This script must be run from a directory containing app/bootstrap.php.\n");
+// Find Mautic installation
+$mauticRoot = null;
+$currentDir = __DIR__;
+
+// Check current directory
+if (file_exists($currentDir . '/app/bootstrap.php')) {
+    $mauticRoot = $currentDir;
+}
+// Check parent directory
+elseif (file_exists($currentDir . '/../app/bootstrap.php')) {
+    $mauticRoot = $currentDir . '/..';
+}
+// Check if we're in docroot
+elseif (file_exists($currentDir . '/../docroot/app/bootstrap.php')) {
+    $mauticRoot = $currentDir . '/../docroot';
 }
 
+if (!$mauticRoot) {
+    die("Error: Could not find Mautic installation. Please run this script from the plugin directory or Mautic root.\n");
+}
+
+echo "Found Mautic installation at: $mauticRoot\n";
+
 // Load Mautic
-require_once 'app/bootstrap.php';
+require_once $mauticRoot . '/app/bootstrap.php';
 
 try {
     echo "Installing EmailThreads Plugin...\n";
