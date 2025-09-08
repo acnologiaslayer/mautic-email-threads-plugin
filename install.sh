@@ -44,12 +44,29 @@ if [ ! -d "$MAUTIC_PATH" ]; then
     exit 1
 fi
 
-if [ ! -f "$MAUTIC_PATH/app/bootstrap.php" ]; then
-    print_error "Invalid Mautic directory. bootstrap.php not found in: $MAUTIC_PATH"
+# Check for bootstrap.php in different possible locations
+BOOTSTRAP_FOUND=false
+if [ -f "$MAUTIC_PATH/app/bootstrap.php" ]; then
+    BOOTSTRAP_FOUND=true
+    MAUTIC_ROOT="$MAUTIC_PATH"
+elif [ -f "$MAUTIC_PATH/docroot/app/bootstrap.php" ]; then
+    BOOTSTRAP_FOUND=true
+    MAUTIC_ROOT="$MAUTIC_PATH/docroot"
+elif [ -f "$MAUTIC_PATH/bootstrap.php" ]; then
+    BOOTSTRAP_FOUND=true
+    MAUTIC_ROOT="$MAUTIC_PATH"
+fi
+
+if [ "$BOOTSTRAP_FOUND" = false ]; then
+    print_error "Invalid Mautic directory. bootstrap.php not found in:"
+    print_error "  - $MAUTIC_PATH/app/bootstrap.php"
+    print_error "  - $MAUTIC_PATH/docroot/app/bootstrap.php"
+    print_error "  - $MAUTIC_PATH/bootstrap.php"
     exit 1
 fi
 
 print_status "Mautic directory validated: $MAUTIC_PATH"
+print_status "Mautic root found at: $MAUTIC_ROOT"
 
 # Get current plugin directory
 PLUGIN_DIR=$(pwd)
@@ -59,7 +76,8 @@ echo ""
 echo "📋 Installation Summary:"
 echo "  Plugin Directory: $PLUGIN_DIR"
 echo "  Mautic Directory: $MAUTIC_PATH"
-echo "  Target Plugin Path: $MAUTIC_PATH/plugins/$PLUGIN_NAME"
+echo "  Mautic Root: $MAUTIC_ROOT"
+echo "  Target Plugin Path: $MAUTIC_ROOT/plugins/$PLUGIN_NAME"
 echo ""
 
 read -p "Continue with installation? (y/N): " -n 1 -r
@@ -72,24 +90,24 @@ fi
 # Step 1: Copy plugin files
 echo ""
 echo "📁 Step 1: Copying plugin files..."
-if [ -d "$MAUTIC_PATH/plugins/$PLUGIN_NAME" ]; then
+if [ -d "$MAUTIC_ROOT/plugins/$PLUGIN_NAME" ]; then
     print_warning "Plugin directory already exists. Backing up..."
-    mv "$MAUTIC_PATH/plugins/$PLUGIN_NAME" "$MAUTIC_PATH/plugins/${PLUGIN_NAME}.backup.$(date +%Y%m%d_%H%M%S)"
+    mv "$MAUTIC_ROOT/plugins/$PLUGIN_NAME" "$MAUTIC_ROOT/plugins/${PLUGIN_NAME}.backup.$(date +%Y%m%d_%H%M%S)"
 fi
 
-cp -r "$PLUGIN_DIR" "$MAUTIC_PATH/plugins/$PLUGIN_NAME"
+cp -r "$PLUGIN_DIR" "$MAUTIC_ROOT/plugins/$PLUGIN_NAME"
 print_status "Plugin files copied successfully"
 
 # Step 2: Copy installation script
 echo ""
 echo "📄 Step 2: Copying installation script..."
-cp "$PLUGIN_DIR/install_plugin.php" "$MAUTIC_PATH/"
+cp "$PLUGIN_DIR/install_plugin.php" "$MAUTIC_ROOT/"
 print_status "Installation script copied"
 
 # Step 3: Run database installation
 echo ""
 echo "🗄️  Step 3: Creating database tables..."
-cd "$MAUTIC_PATH"
+cd "$MAUTIC_ROOT"
 
 if php install_plugin.php; then
     print_status "Database tables created successfully"
@@ -114,20 +132,20 @@ echo ""
 echo "🔐 Step 5: Setting file permissions..."
 if command -v chown >/dev/null 2>&1; then
     # Try to set proper ownership (may require sudo)
-    if sudo chown -R www-data:www-data "$MAUTIC_PATH/plugins/$PLUGIN_NAME" 2>/dev/null; then
+    if sudo chown -R www-data:www-data "$MAUTIC_ROOT/plugins/$PLUGIN_NAME" 2>/dev/null; then
         print_status "File ownership set to www-data"
     else
         print_warning "Could not set file ownership (may need sudo)"
     fi
 fi
 
-chmod -R 755 "$MAUTIC_PATH/plugins/$PLUGIN_NAME"
+chmod -R 755 "$MAUTIC_ROOT/plugins/$PLUGIN_NAME"
 print_status "File permissions set"
 
 # Cleanup
 echo ""
 echo "🧹 Step 6: Cleaning up..."
-rm -f "$MAUTIC_PATH/install_plugin.php"
+rm -f "$MAUTIC_ROOT/install_plugin.php"
 print_status "Installation script removed"
 
 echo ""
