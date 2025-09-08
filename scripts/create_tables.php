@@ -10,7 +10,24 @@
  * 2. Run: php create_tables.php
  */
 
-require_once __DIR__ . '/vendor/autoload.php';
+// Try to find Mautic's bootstrap
+$bootstrapPaths = [
+    __DIR__ . '/../../app/config/bootstrap.php',
+    __DIR__ . '/../../../app/config/bootstrap.php',
+];
+
+$bootstrapFound = false;
+foreach ($bootstrapPaths as $path) {
+    if (file_exists($path)) {
+        require_once $path;
+        $bootstrapFound = true;
+        break;
+    }
+}
+
+if (!$bootstrapFound) {
+    die("Error: Could not find Mautic bootstrap. Please run this from the plugin directory within Mautic.\n");
+}
 
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Tools\SchemaTool;
