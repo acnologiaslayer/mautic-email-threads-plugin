@@ -6,12 +6,12 @@
 echo "Testing EmailThreads Database Structure\n";
 echo "=====================================\n\n";
 
-// Get database credentials
-$dbHost = 'localhost';
+// Get database credentials from environment
+$dbHost = getenv('MAUTIC_DB_HOST') ?: 'db';
 $dbPort = 3306;
-$dbName = 'mautic';
-$dbUser = 'root';
-$dbPassword = '';
+$dbName = getenv('MAUTIC_DB_NAME') ?: 'mautic';
+$dbUser = getenv('MAUTIC_DB_USER') ?: 'mautic';
+$dbPassword = getenv('MAUTIC_DB_PASSWORD') ?: 'mauticpass';
 
 try {
     $dsn = "mysql:host=$dbHost;port=$dbPort;dbname=$dbName;charset=utf8mb4";
