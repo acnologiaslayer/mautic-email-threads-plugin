@@ -57,11 +57,6 @@ return [
     
     'services' => [
         'events' => [
-               'mautic.emailthreads.subscriber.email' => [
-                   'class'     => \MauticPlugin\MauticEmailThreadsBundle\EventListener\EmailSubscriberMinimal::class,
-                'arguments' => [],
-                'tags' => ['kernel.event_subscriber'],
-            ],
         ],
         'forms' => [
             'mautic.emailthreads.form.type.config' => [
