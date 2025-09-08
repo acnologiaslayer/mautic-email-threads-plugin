@@ -62,8 +62,13 @@ try {
     require_once $mauticRoot . '/app/config/bootstrap.php';
     print_status("Mautic bootstrap loaded");
     
-    $container = \Mautic\CoreBundle\Factory\MauticFactory::getContainer();
-    $connection = $container->get('doctrine.orm.entity_manager')->getConnection();
+    // For Mautic 5, we need to use the kernel
+    $kernel = new \AppKernel('prod', false);
+    $kernel->boot();
+    $container = $kernel->getContainer();
+    
+    $entityManager = $container->get('doctrine.orm.entity_manager');
+    $connection = $entityManager->getConnection();
     print_status("Database connection established");
     
 } catch (Exception $e) {
