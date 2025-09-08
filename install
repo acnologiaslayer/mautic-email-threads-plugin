@@ -8,7 +8,7 @@ echo "======================================="
 echo ""
 
 # Check if we're in the plugin directory
-if [ ! -f "install_simple_sql.php" ]; then
+if [ ! -f "scripts/install_auto.php" ]; then
     echo "❌ Error: This script must be run from the EmailThreads plugin directory"
     echo "Please cd into the plugin directory and run: ./install"
     exit 1
@@ -22,7 +22,7 @@ fi
 
 # Run the automated installation
 echo "Running automated installation..."
-php install_simple_sql.php
+php scripts/install_auto.php
 
 # Check if installation was successful
 if [ $? -eq 0 ]; then
