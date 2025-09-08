@@ -57,8 +57,8 @@ return [
     
     'services' => [
         'events' => [
-            'mautic.emailthreads.subscriber.email' => [
-                'class'     => \MauticPlugin\MauticEmailThreadsBundle\EventListener\EmailSubscriber::class,
+               'mautic.emailthreads.subscriber.email' => [
+                   'class'     => \MauticPlugin\MauticEmailThreadsBundle\EventListener\EmailSubscriberSimple::class,
                 'arguments' => [
                     'mautic.emailthreads.model.thread',
                     'mautic.emailthreads.model.message',

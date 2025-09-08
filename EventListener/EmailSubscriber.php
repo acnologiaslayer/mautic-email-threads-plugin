@@ -104,29 +104,33 @@ class EmailSubscriber implements EventSubscriberInterface
 
     public function onEmailSend(EmailSendEvent $event): void
     {
-        error_log('EmailThreads: EmailSubscriber::onEmailSend called');
-        
-        // Always add a simple test message to verify the plugin is working
-        $this->addSimpleTestMessage($event);
-        
-        // Check database tables exist before processing
-        $this->verifyDatabaseTables();
-        
-        // Add debugging information about the email and lead
-        $this->debugEmailAndLead($event);
-        
-        // Check if content was already modified (contains our thread content)
-        $content = $event->getContent();
-        if ($content && strpos($content, 'email-thread-container') !== false) {
-            error_log('EmailThreads: onEmailSend - Thread content already present, skipping');
-            return;
+        try {
+            error_log('EmailThreads: EmailSubscriber::onEmailSend called');
+            
+            // Always add a simple test message to verify the plugin is working
+            $this->addSimpleTestMessage($event);
+            
+            // Check database tables exist before processing
+            $this->verifyDatabaseTables();
+            
+            // Add debugging information about the email and lead
+            $this->debugEmailAndLead($event);
+            
+            // Check if content was already modified (contains our thread content)
+            $content = $event->getContent();
+            if ($content && strpos($content, 'email-thread-container') !== false) {
+                error_log('EmailThreads: onEmailSend - Thread content already present, skipping');
+                return;
+            }
+            
+            // Process email threading
+            $this->processEmailThreading($event);
+            
+        } catch (\Exception $e) {
+            error_log('EmailThreads: onEmailSend - Error: ' . $e->getMessage());
+            error_log('EmailThreads: onEmailSend - Stack trace: ' . $e->getTraceAsString());
+            // Don't re-throw the exception to prevent 500 errors
         }
-        
-        // Process email threading
-        $this->processEmailThreading($event);
-        
-        // Force content modification as a last resort
-        $this->forceContentModification($event);
     }
     
     /**
@@ -238,28 +242,28 @@ class EmailSubscriber implements EventSubscriberInterface
             
             $connection = $this->entityManager->getConnection();
             
-            // Check if email_threads table exists
-            $threadsTableExists = $connection->executeQuery("SHOW TABLES LIKE 'email_threads'")->rowCount() > 0;
-            error_log('EmailThreads: Database check - email_threads table exists: ' . ($threadsTableExists ? 'YES' : 'NO'));
+            // Check if mt_EmailThread table exists
+            $threadsTableExists = $connection->executeQuery("SHOW TABLES LIKE 'mt_EmailThread'")->rowCount() > 0;
+            error_log('EmailThreads: Database check - mt_EmailThread table exists: ' . ($threadsTableExists ? 'YES' : 'NO'));
             
-            // Check if email_thread_messages table exists
-            $messagesTableExists = $connection->executeQuery("SHOW TABLES LIKE 'email_thread_messages'")->rowCount() > 0;
-            error_log('EmailThreads: Database check - email_thread_messages table exists: ' . ($messagesTableExists ? 'YES' : 'NO'));
+            // Check if mt_EmailThreadMessage table exists
+            $messagesTableExists = $connection->executeQuery("SHOW TABLES LIKE 'mt_EmailThreadMessage'")->rowCount() > 0;
+            error_log('EmailThreads: Database check - mt_EmailThreadMessage table exists: ' . ($messagesTableExists ? 'YES' : 'NO'));
             
             if (!$threadsTableExists || !$messagesTableExists) {
                 error_log('EmailThreads: ERROR - Required database tables are missing! Plugin may not work correctly.');
                 error_log('EmailThreads: Please install/upgrade the plugin through Mautic admin to create the tables.');
             } else {
                 // Check table structure
-                $threadsColumns = $connection->executeQuery("DESCRIBE email_threads")->fetchAllAssociative();
-                $messagesColumns = $connection->executeQuery("DESCRIBE email_thread_messages")->fetchAllAssociative();
+                $threadsColumns = $connection->executeQuery("DESCRIBE mt_EmailThread")->fetchAllAssociative();
+                $messagesColumns = $connection->executeQuery("DESCRIBE mt_EmailThreadMessage")->fetchAllAssociative();
                 
-                error_log('EmailThreads: email_threads table has ' . count($threadsColumns) . ' columns');
-                error_log('EmailThreads: email_thread_messages table has ' . count($messagesColumns) . ' columns');
+                error_log('EmailThreads: mt_EmailThread table has ' . count($threadsColumns) . ' columns');
+                error_log('EmailThreads: mt_EmailThreadMessage table has ' . count($messagesColumns) . ' columns');
                 
                 // Check if we can query the tables
-                $threadCount = $connection->executeQuery("SELECT COUNT(*) FROM email_threads")->fetchOne();
-                $messageCount = $connection->executeQuery("SELECT COUNT(*) FROM email_thread_messages")->fetchOne();
+                $threadCount = $connection->executeQuery("SELECT COUNT(*) FROM mt_EmailThread")->fetchOne();
+                $messageCount = $connection->executeQuery("SELECT COUNT(*) FROM mt_EmailThreadMessage")->fetchOne();
                 
                 error_log('EmailThreads: Current database state - Threads: ' . $threadCount . ', Messages: ' . $messageCount);
             }
@@ -385,15 +389,6 @@ class EmailSubscriber implements EventSubscriberInterface
             }
         } else {
             error_log("EmailThreads: Skipping thread content injection - injectPreviousMessages: " . ($injectPreviousMessages ? 'true' : 'false') . ", existingMessages: " . count($existingMessages));
-            
-            // Add a simple test message to verify the plugin is working
-            $this->addTestMessage($event);
-            
-            // Also create a test thread to verify database functionality
-            $this->createTestThread($event);
-            
-            // Force create a thread and message for this email to test threading
-            $this->forceCreateThreadForTesting($event);
         }
             
         } catch (\Exception $e) {
