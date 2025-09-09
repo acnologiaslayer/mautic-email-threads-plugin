@@ -99,8 +99,8 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
     {
         try {
             $content = $event->getContent();
-            if (!$content) {
-                error_log('EmailThreads: addThreadingContent - No content to modify');
+            if (!$content || !is_string($content)) {
+                error_log('EmailThreads: addThreadingContent - No valid content to modify');
                 return;
             }
             
@@ -129,12 +129,20 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             // Build threading content from real previous messages
             $threadingContent = $this->buildThreadingContent($previousMessages, $leadName);
             
-            // Add threading content
-            $currentContent = $event->getContent();
-            $newContent = $currentContent . $threadingContent;
-            $event->setContent($newContent);
+            if (empty($threadingContent)) {
+                error_log('EmailThreads: addThreadingContent - No threading content generated');
+                return;
+            }
             
-            error_log('EmailThreads: addThreadingContent - Added real threading content for lead: ' . $leadId . ' with ' . count($previousMessages) . ' previous messages');
+            // Ensure we have valid content before setting
+            $currentContent = $event->getContent();
+            if ($currentContent && is_string($currentContent)) {
+                $newContent = $currentContent . $threadingContent;
+                $event->setContent($newContent);
+                error_log('EmailThreads: addThreadingContent - Added real threading content for lead: ' . $leadId . ' with ' . count($previousMessages) . ' previous messages');
+            } else {
+                error_log('EmailThreads: addThreadingContent - Current content is invalid, skipping modification');
+            }
         } catch (\Exception $e) {
             error_log('EmailThreads: addThreadingContent - Error: ' . $e->getMessage());
         }
@@ -175,27 +183,37 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
     
     private function buildThreadingContent(array $messages, string $leadName): string
     {
-        if (empty($messages)) {
-            return '';
-        }
-        
-        $content = '
-<div style="margin: 20px 0; padding: 15px; background-color: #f5f5f5; border-left: 4px solid #666; font-family: Arial, sans-serif;">
-    <h4 style="color: #333; margin: 0 0 10px 0;">📧 Previous Messages in Thread</h4>';
-        
-        foreach ($messages as $message) {
-            $fromEmail = $message['from_email'] ?? 'Unknown';
-            $fromName = $message['from_name'] ?? '';
-            $subject = $message['subject'] ?? 'No Subject';
-            $dateSent = $message['date_sent'] ? date('Y-m-d H:i:s', strtotime($message['date_sent'])) : 'Unknown Date';
-            $messageContent = $message['content'] ?? '';
-            
-            // Truncate content if too long
-            if (strlen($messageContent) > 500) {
-                $messageContent = substr($messageContent, 0, 500) . '...';
+        try {
+            if (empty($messages)) {
+                return '';
             }
             
-            $content .= '
+            $content = '
+<div style="margin: 20px 0; padding: 15px; background-color: #f5f5f5; border-left: 4px solid #666; font-family: Arial, sans-serif;">
+    <h4 style="color: #333; margin: 0 0 10px 0;">📧 Previous Messages in Thread</h4>';
+            
+            foreach ($messages as $message) {
+                if (!is_array($message)) {
+                    continue;
+                }
+                
+                $fromEmail = $message['from_email'] ?? 'Unknown';
+                $fromName = $message['from_name'] ?? '';
+                $subject = $message['subject'] ?? 'No Subject';
+                $dateSent = $message['date_sent'] ? date('Y-m-d H:i:s', strtotime($message['date_sent'])) : 'Unknown Date';
+                $messageContent = $message['content'] ?? '';
+                
+                // Ensure messageContent is a string
+                if (!is_string($messageContent)) {
+                    $messageContent = '';
+                }
+                
+                // Truncate content if too long
+                if (strlen($messageContent) > 500) {
+                    $messageContent = substr($messageContent, 0, 500) . '...';
+                }
+                
+                $content .= '
     <div style="border-left: 2px solid #ccc; padding-left: 15px; margin: 10px 0;">
         <p style="margin: 5px 0; color: #666;"><strong>From:</strong> ' . htmlspecialchars($fromName ? $fromName . ' <' . $fromEmail . '>' : $fromEmail) . '</p>
         <p style="margin: 5px 0; color: #666;"><strong>To:</strong> ' . htmlspecialchars($leadName) . '</p>
@@ -205,12 +223,16 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             ' . htmlspecialchars($messageContent) . '
         </div>
     </div>';
-        }
-        
-        $content .= '
+            }
+            
+            $content .= '
 </div>';
-        
-        return $content;
+            
+            return $content;
+        } catch (\Exception $e) {
+            error_log('EmailThreads: buildThreadingContent - Error: ' . $e->getMessage());
+            return '';
+        }
     }
     
     private function cleanSubject(string $subject): string
