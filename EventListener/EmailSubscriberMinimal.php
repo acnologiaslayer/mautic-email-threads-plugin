@@ -63,6 +63,9 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             // Add simple test message
             $this->addSimpleTestMessage($event);
             
+            // Save current email to database for threading
+            $this->saveEmailToDatabase($event);
+            
             // Add simulated threading content
             $this->addThreadingContent($event);
             
@@ -267,5 +270,77 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
         // Remove common reply prefixes
         $subject = preg_replace('/^(Re:|RE:|Fwd:|FWD:)\s*/i', '', $subject);
         return trim($subject);
+    }
+    
+    private function saveEmailToDatabase(EmailSendEvent $event): void
+    {
+        try {
+            $email = $event->getEmail();
+            $leadData = $event->getLead();
+            $content = $event->getContent();
+            
+            if (!$email || !$leadData || !is_array($leadData) || !isset($leadData['id'])) {
+                error_log('EmailThreads: saveEmailToDatabase - Missing required data');
+                return;
+            }
+            
+            $leadId = $leadData['id'];
+            $subject = $email->getSubject();
+            $fromEmail = $email->getFromAddress();
+            $fromName = $email->getFromName();
+            
+            // Get database connection details from environment
+            $dbHost = getenv('MAUTIC_DB_HOST') ?: 'db';
+            $dbPort = 3306;
+            $dbName = getenv('MAUTIC_DB_NAME') ?: 'mautic';
+            $dbUser = getenv('MAUTIC_DB_USER') ?: 'mautic';
+            $dbPassword = getenv('MAUTIC_DB_PASSWORD') ?: 'mauticpass';
+            
+            // Create PDO connection
+            $dsn = "mysql:host=$dbHost;port=$dbPort;dbname=$dbName;charset=utf8mb4";
+            $pdo = new \PDO($dsn, $dbUser, $dbPassword, [
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+                \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+            ]);
+            
+            // Generate thread ID
+            $threadId = 'thread_' . $leadId . '_' . md5($subject . $leadId);
+            
+            // Check if thread exists
+            $checkThreadSql = "SELECT id FROM mt_EmailThread WHERE thread_id = ? AND lead_id = ?";
+            $stmt = $pdo->prepare($checkThreadSql);
+            $stmt->execute([$threadId, $leadId]);
+            $existingThread = $stmt->fetch();
+            
+            $threadDbId = null;
+            if ($existingThread) {
+                $threadDbId = $existingThread['id'];
+                error_log('EmailThreads: saveEmailToDatabase - Using existing thread ID: ' . $threadDbId);
+            } else {
+                // Create new thread
+                $createThreadSql = "
+                    INSERT INTO mt_EmailThread (thread_id, lead_id, subject, from_email, from_name, first_message_date, last_message_date, is_active, date_added, date_modified)
+                    VALUES (?, ?, ?, ?, ?, NOW(), NOW(), 1, NOW(), NOW())
+                ";
+                $stmt = $pdo->prepare($createThreadSql);
+                $stmt->execute([$threadId, $leadId, $subject, $fromEmail, $fromName]);
+                $threadDbId = $pdo->lastInsertId();
+                error_log('EmailThreads: saveEmailToDatabase - Created new thread ID: ' . $threadDbId);
+            }
+            
+            // Save message
+            $saveMessageSql = "
+                INSERT INTO mt_EmailThreadMessage (thread_id, subject, content, from_email, from_name, date_sent, email_type, date_added, date_modified)
+                VALUES (?, ?, ?, ?, ?, NOW(), 'sent', NOW(), NOW())
+            ";
+            $stmt = $pdo->prepare($saveMessageSql);
+            $stmt->execute([$threadDbId, $subject, $content, $fromEmail, $fromName]);
+            $messageId = $pdo->lastInsertId();
+            
+            error_log('EmailThreads: saveEmailToDatabase - Saved message ID: ' . $messageId . ' for thread: ' . $threadDbId . ', lead: ' . $leadId);
+            
+        } catch (\Exception $e) {
+            error_log('EmailThreads: saveEmailToDatabase - Error: ' . $e->getMessage());
+        }
     }
 }
