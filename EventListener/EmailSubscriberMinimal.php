@@ -60,13 +60,10 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             error_log('EmailThreads: Lead data type: ' . (is_array($leadData) ? 'array' : (is_object($leadData) ? get_class($leadData) : gettype($leadData))));
             error_log('EmailThreads: Content length: ' . ($content ? strlen($content) : 'null'));
             
-            // Add simple test message
-            $this->addSimpleTestMessage($event);
-            
             // Save current email to database for threading
             $this->saveEmailToDatabase($event);
             
-            // Add simulated threading content
+            // Add threading content
             $this->addThreadingContent($event);
             
         } catch (\Exception $e) {
@@ -75,31 +72,6 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
         }
     }
     
-    private function addSimpleTestMessage(EmailSendEvent $event): void
-    {
-        try {
-            $content = $event->getContent();
-            if (!$content) {
-                error_log('EmailThreads: addSimpleTestMessage - No content to modify');
-                return;
-            }
-            
-            $testMessage = '<div style="margin: 20px 0; padding: 12px; background: #f8f9fa; border: 1px solid #e8eaed; border-radius: 8px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif;">
-                <div style="display: flex; align-items: center; margin-bottom: 4px;">
-                    <span style="color: #1a73e8; font-size: 16px; margin-right: 8px;">🔧</span>
-                    <strong style="color: #1a73e8; font-size: 14px; font-weight: 500;">Email Threads Plugin Active</strong>
-                </div>
-                <span style="color: #5f6368; font-size: 12px; line-height: 1.4;">Previous messages in this conversation will appear above this notice.</span>
-            </div>';
-            
-            $newContent = $content . $testMessage;
-            $event->setContent($newContent);
-            
-            error_log('EmailThreads: addSimpleTestMessage - Added simple test message to email');
-        } catch (\Exception $e) {
-            error_log('EmailThreads: addSimpleTestMessage - Error: ' . $e->getMessage());
-        }
-    }
     
     private function addThreadingContent(EmailSendEvent $event): void
     {
