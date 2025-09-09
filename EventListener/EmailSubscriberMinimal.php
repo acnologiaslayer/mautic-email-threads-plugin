@@ -194,19 +194,12 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             }
             
             $messageCount = count($messages);
-            $threadId = 'thread_' . uniqid();
             
             $content = '
 <div style="margin: 20px 0; border-top: 1px solid #e1e5e9; padding-top: 20px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif;">
-    <div style="display: flex; align-items: center; margin-bottom: 16px; cursor: pointer;" onclick="toggleThread(\'' . $threadId . '\')">
-        <div style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; margin-right: 8px; border-radius: 50%; background: #f1f3f4; transition: all 0.2s ease;">
-            <span id="' . $threadId . '_icon" style="color: #5f6368; font-size: 12px; transform: rotate(0deg); transition: transform 0.2s ease;">▼</span>
-        </div>
-        <div style="color: #5f6368; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px;">
-            ' . $messageCount . ' Previous Message' . ($messageCount > 1 ? 's' : '') . '
-        </div>
-    </div>
-    <div id="' . $threadId . '_content" style="display: block;">';
+    <div style="color: #5f6368; font-size: 12px; font-weight: 500; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.3px; border-bottom: 1px solid #e1e5e9; padding-bottom: 8px;">
+        ' . $messageCount . ' Previous Message' . ($messageCount > 1 ? 's' : '') . '
+    </div>';
             
             foreach ($messages as $index => $message) {
                 if (!is_array($message)) {
@@ -256,23 +249,7 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             }
             
             $content .= '
-    </div>
-</div>
-
-<script>
-function toggleThread(threadId) {
-    const content = document.getElementById(threadId + "_content");
-    const icon = document.getElementById(threadId + "_icon");
-    
-    if (content.style.display === "none") {
-        content.style.display = "block";
-        icon.style.transform = "rotate(0deg)";
-    } else {
-        content.style.display = "none";
-        icon.style.transform = "rotate(-90deg)";
-    }
-}
-</script>';
+</div>';
             
             return $content;
         } catch (\Exception $e) {
