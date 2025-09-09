@@ -7,9 +7,16 @@ namespace MauticPlugin\MauticEmailThreadsBundle\EventListener;
 use Mautic\EmailBundle\EmailEvents;
 use Mautic\EmailBundle\Event\EmailSendEvent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Doctrine\ORM\EntityManagerInterface;
 
 class EmailSubscriberMinimal implements EventSubscriberInterface
 {
+    private EntityManagerInterface $entityManager;
+    
+    public function __construct(EntityManagerInterface $entityManager)
+    {
+        $this->entityManager = $entityManager;
+    }
     public static function getSubscribedEvents(): array
     {
         $events = [];
@@ -100,40 +107,116 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             $email = $event->getEmail();
             $leadData = $event->getLead();
             
-            // Create simulated previous message
-            $leadName = 'Unknown';
-            if (is_array($leadData)) {
-                $leadName = trim(($leadData['firstname'] ?? '') . ' ' . ($leadData['lastname'] ?? ''));
-                if (empty($leadName)) {
-                    $leadName = $leadData['email'] ?? 'Unknown';
-                }
+            if (!$email || !$leadData || !is_array($leadData) || !isset($leadData['id'])) {
+                error_log('EmailThreads: addThreadingContent - Missing required data');
+                return;
             }
             
-            $threadingContent = '
-<div style="margin: 20px 0; padding: 15px; background-color: #f5f5f5; border-left: 4px solid #666; font-family: Arial, sans-serif;">
-    <h4 style="color: #333; margin: 0 0 10px 0;">📧 Previous Messages in Thread</h4>
-    <div style="border-left: 2px solid #ccc; padding-left: 15px; margin: 10px 0;">
-        <p style="margin: 5px 0; color: #666;"><strong>From:</strong> support@example.com</p>
-        <p style="margin: 5px 0; color: #666;"><strong>To:</strong> ' . htmlspecialchars($leadName) . '</p>
-        <p style="margin: 5px 0; color: #666;"><strong>Subject:</strong> ' . htmlspecialchars($email ? $email->getSubject() : 'Previous Email') . '</p>
-        <p style="margin: 5px 0; color: #666;"><strong>Date:</strong> ' . date('Y-m-d H:i:s', strtotime('-1 day')) . '</p>
-        <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 3px;">
-            <p>This is a simulated previous message in the email thread.</p>
-            <p>Hello ' . htmlspecialchars($leadName) . ',</p>
-            <p>Thank you for your previous inquiry. This message demonstrates how email threading would work in the Email Threads plugin.</p>
-            <p>Best regards,<br>Support Team</p>
-        </div>
-    </div>
-</div>';
+            $leadId = $leadData['id'];
+            $leadName = trim(($leadData['firstname'] ?? '') . ' ' . ($leadData['lastname'] ?? ''));
+            if (empty($leadName)) {
+                $leadName = $leadData['email'] ?? 'Unknown';
+            }
             
-            // Add threading content before the test message
+            // Try to find previous messages for this lead
+            $previousMessages = $this->getPreviousMessages($leadId, $email->getSubject());
+            
+            if (empty($previousMessages)) {
+                error_log('EmailThreads: addThreadingContent - No previous messages found for lead: ' . $leadId);
+                return;
+            }
+            
+            // Build threading content from real previous messages
+            $threadingContent = $this->buildThreadingContent($previousMessages, $leadName);
+            
+            // Add threading content
             $currentContent = $event->getContent();
             $newContent = $currentContent . $threadingContent;
             $event->setContent($newContent);
             
-            error_log('EmailThreads: addThreadingContent - Added threading content for lead: ' . $leadName);
+            error_log('EmailThreads: addThreadingContent - Added real threading content for lead: ' . $leadId . ' with ' . count($previousMessages) . ' previous messages');
         } catch (\Exception $e) {
             error_log('EmailThreads: addThreadingContent - Error: ' . $e->getMessage());
         }
+    }
+    
+    private function getPreviousMessages(int $leadId, string $subject): array
+    {
+        try {
+            $connection = $this->entityManager->getConnection();
+            
+            // Clean subject for matching
+            $cleanSubject = $this->cleanSubject($subject);
+            
+            // Find previous messages for this lead with similar subject
+            $sql = "
+                SELECT etm.*, et.thread_id, et.from_email, et.from_name
+                FROM mt_EmailThreadMessage etm
+                JOIN mt_EmailThread et ON etm.thread_id = et.id
+                WHERE et.lead_id = ? 
+                AND et.is_active = 1
+                AND etm.date_sent < NOW()
+                ORDER BY etm.date_sent DESC
+                LIMIT 3
+            ";
+            
+            $stmt = $connection->prepare($sql);
+            $stmt->execute([$leadId]);
+            $messages = $stmt->fetchAllAssociative();
+            
+            error_log('EmailThreads: getPreviousMessages - Found ' . count($messages) . ' previous messages for lead: ' . $leadId);
+            
+            return $messages;
+        } catch (\Exception $e) {
+            error_log('EmailThreads: getPreviousMessages - Error: ' . $e->getMessage());
+            return [];
+        }
+    }
+    
+    private function buildThreadingContent(array $messages, string $leadName): string
+    {
+        if (empty($messages)) {
+            return '';
+        }
+        
+        $content = '
+<div style="margin: 20px 0; padding: 15px; background-color: #f5f5f5; border-left: 4px solid #666; font-family: Arial, sans-serif;">
+    <h4 style="color: #333; margin: 0 0 10px 0;">📧 Previous Messages in Thread</h4>';
+        
+        foreach ($messages as $message) {
+            $fromEmail = $message['from_email'] ?? 'Unknown';
+            $fromName = $message['from_name'] ?? '';
+            $subject = $message['subject'] ?? 'No Subject';
+            $dateSent = $message['date_sent'] ? date('Y-m-d H:i:s', strtotime($message['date_sent'])) : 'Unknown Date';
+            $messageContent = $message['content'] ?? '';
+            
+            // Truncate content if too long
+            if (strlen($messageContent) > 500) {
+                $messageContent = substr($messageContent, 0, 500) . '...';
+            }
+            
+            $content .= '
+    <div style="border-left: 2px solid #ccc; padding-left: 15px; margin: 10px 0;">
+        <p style="margin: 5px 0; color: #666;"><strong>From:</strong> ' . htmlspecialchars($fromName ? $fromName . ' <' . $fromEmail . '>' : $fromEmail) . '</p>
+        <p style="margin: 5px 0; color: #666;"><strong>To:</strong> ' . htmlspecialchars($leadName) . '</p>
+        <p style="margin: 5px 0; color: #666;"><strong>Subject:</strong> ' . htmlspecialchars($subject) . '</p>
+        <p style="margin: 5px 0; color: #666;"><strong>Date:</strong> ' . htmlspecialchars($dateSent) . '</p>
+        <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 3px;">
+            ' . htmlspecialchars($messageContent) . '
+        </div>
+    </div>';
+        }
+        
+        $content .= '
+</div>';
+        
+        return $content;
+    }
+    
+    private function cleanSubject(string $subject): string
+    {
+        // Remove common reply prefixes
+        $subject = preg_replace('/^(Re:|RE:|Fwd:|FWD:)\s*/i', '', $subject);
+        return trim($subject);
     }
 }
