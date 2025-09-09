@@ -168,7 +168,6 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
                 AND et.is_active = 1
                 AND etm.date_sent < NOW()
                 ORDER BY etm.date_sent DESC
-                LIMIT 3
             ";
             
             error_log('EmailThreads: getPreviousMessages - Executing SQL: ' . $sql . ' with leadId: ' . $leadId);
@@ -197,9 +196,12 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             
             $content = '
 <div style="margin: 20px 0; border-top: 1px solid #e1e5e9; padding-top: 20px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif;">
-    <div style="color: #5f6368; font-size: 12px; font-weight: 500; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.3px; border-bottom: 1px solid #e1e5e9; padding-bottom: 8px;">
-        ' . $messageCount . ' Previous Message' . ($messageCount > 1 ? 's' : '') . '
-    </div>';
+    <details style="margin-bottom: 16px;">
+        <summary style="color: #5f6368; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px; border-bottom: 1px solid #e1e5e9; padding-bottom: 8px; cursor: pointer; list-style: none; outline: none;">
+            <span style="display: inline-block; margin-right: 8px; transition: transform 0.2s ease;">▼</span>
+            ' . $messageCount . ' Previous Message' . ($messageCount > 1 ? 's' : '') . '
+        </summary>
+        <div style="margin-top: 16px;">';
             
             foreach ($messages as $index => $message) {
                 if (!is_array($message)) {
@@ -249,6 +251,8 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             }
             
             $content .= '
+        </div>
+    </details>
 </div>';
             
             return $content;
@@ -295,6 +299,16 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
     private function formatMessageContent(string $content): string
     {
         try {
+            // Remove signatures (common patterns)
+            $content = preg_replace('/\n\s*--\s*\n.*$/s', '', $content); // Remove -- signature
+            $content = preg_replace('/\n\s*Best regards?.*$/s', '', $content); // Remove "Best regards" signatures
+            $content = preg_replace('/\n\s*Sincerely.*$/s', '', $content); // Remove "Sincerely" signatures
+            $content = preg_replace('/\n\s*Thanks?.*$/s', '', $content); // Remove "Thanks" signatures
+            $content = preg_replace('/\n\s*Regards.*$/s', '', $content); // Remove "Regards" signatures
+            $content = preg_replace('/\n\s*Sent from.*$/s', '', $content); // Remove "Sent from" signatures
+            $content = preg_replace('/\n\s*Get Outlook.*$/s', '', $content); // Remove Outlook signatures
+            $content = preg_replace('/\n\s*Get Gmail.*$/s', '', $content); // Remove Gmail signatures
+            
             // Remove HTML tags but preserve line breaks and basic formatting
             $content = strip_tags($content, '<p><br><strong><em><u><a><ul><ol><li><h1><h2><h3><h4><h5><h6><blockquote><pre>');
             

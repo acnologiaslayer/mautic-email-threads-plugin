@@ -146,7 +146,6 @@ class EmailSubscriber implements EventSubscriberInterface
             }
             
             $testMessage = '<div style="margin: 20px 0; padding: 15px; background: #e3f2fd; border-left: 4px solid #2196f3; font-family: Arial, sans-serif;">
-                <strong style="color: #1976d2;">🔧 Email Threads Plugin Test</strong><br>
                 <span style="color: #424242; font-size: 14px;">This message confirms the Email Threads plugin is working. If you see this, the plugin is active and processing emails.</span>
             </div>';
             
@@ -447,7 +446,6 @@ class EmailSubscriber implements EventSubscriberInterface
             }
             
             $testMessage = '<div style="margin-top: 20px; padding: 10px; background: #f0f8ff; border-left: 3px solid #007bff; font-size: 12px; color: #666;">
-                <strong>Email Threads Plugin Test:</strong> This message confirms the plugin is working. Thread content will appear here when previous messages exist.
             </div>';
             
             $newContent = $content . $testMessage;
