@@ -151,23 +151,34 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
     private function getPreviousMessages(int $leadId, string $subject): array
     {
         try {
-            $connection = $this->entityManager->getConnection();
+            // Get database connection details from environment
+            $dbHost = getenv('MAUTIC_DB_HOST') ?: 'db';
+            $dbPort = 3306;
+            $dbName = getenv('MAUTIC_DB_NAME') ?: 'mautic';
+            $dbUser = getenv('MAUTIC_DB_USER') ?: 'mautic';
+            $dbPassword = getenv('MAUTIC_DB_PASSWORD') ?: 'mauticpass';
             
-            // Clean subject for matching
-            $cleanSubject = $this->cleanSubject($subject);
+            // Create PDO connection
+            $dsn = "mysql:host=$dbHost;port=$dbPort;dbname=$dbName;charset=utf8mb4";
+            $pdo = new \PDO($dsn, $dbUser, $dbPassword, [
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+                \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+            ]);
             
             error_log('EmailThreads: getPreviousMessages - Looking for messages for lead: ' . $leadId . ', subject: ' . $subject);
             
             // First, let's check if there are any threads for this lead at all
             $checkSql = "SELECT COUNT(*) as count FROM mt_EmailThread WHERE lead_id = ?";
-            $checkResult = $connection->executeQuery($checkSql, [$leadId]);
-            $threadCount = $checkResult->fetchColumn();
+            $stmt = $pdo->prepare($checkSql);
+            $stmt->execute([$leadId]);
+            $threadCount = $stmt->fetchColumn();
             error_log('EmailThreads: getPreviousMessages - Found ' . $threadCount . ' threads for lead: ' . $leadId);
             
             // Check if there are any messages at all
             $messageCheckSql = "SELECT COUNT(*) as count FROM mt_EmailThreadMessage etm JOIN mt_EmailThread et ON etm.thread_id = et.id WHERE et.lead_id = ?";
-            $messageCheckResult = $connection->executeQuery($messageCheckSql, [$leadId]);
-            $messageCount = $messageCheckResult->fetchColumn();
+            $stmt = $pdo->prepare($messageCheckSql);
+            $stmt->execute([$leadId]);
+            $messageCount = $stmt->fetchColumn();
             error_log('EmailThreads: getPreviousMessages - Found ' . $messageCount . ' messages for lead: ' . $leadId);
             
             // Find previous messages for this lead with similar subject
@@ -184,11 +195,9 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             
             error_log('EmailThreads: getPreviousMessages - Executing SQL: ' . $sql . ' with leadId: ' . $leadId);
             
-            $result = $connection->executeQuery($sql, [$leadId]);
-            $messages = [];
-            while ($row = $result->fetch()) {
-                $messages[] = $row;
-            }
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$leadId]);
+            $messages = $stmt->fetchAll();
             
             error_log('EmailThreads: getPreviousMessages - Found ' . count($messages) . ' previous messages for lead: ' . $leadId);
             
