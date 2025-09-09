@@ -221,13 +221,22 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
                 return '';
             }
             
+            $messageCount = count($messages);
+            $threadId = 'thread_' . uniqid();
+            
             $content = '
 <div style="margin: 20px 0; border-top: 1px solid #e1e5e9; padding-top: 20px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif;">
-    <div style="color: #5f6368; font-size: 12px; font-weight: 500; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.3px;">
-        Previous Messages
-    </div>';
+    <div style="display: flex; align-items: center; margin-bottom: 16px; cursor: pointer;" onclick="toggleThread(\'' . $threadId . '\')">
+        <div style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; margin-right: 8px; border-radius: 50%; background: #f1f3f4; transition: all 0.2s ease;">
+            <span id="' . $threadId . '_icon" style="color: #5f6368; font-size: 12px; transform: rotate(0deg); transition: transform 0.2s ease;">▼</span>
+        </div>
+        <div style="color: #5f6368; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px;">
+            ' . $messageCount . ' Previous Message' . ($messageCount > 1 ? 's' : '') . '
+        </div>
+    </div>
+    <div id="' . $threadId . '_content" style="display: block;">';
             
-            foreach ($messages as $message) {
+            foreach ($messages as $index => $message) {
                 if (!is_array($message)) {
                     continue;
                 }
@@ -249,32 +258,68 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
                 // Create sender display
                 $senderDisplay = $fromName ? htmlspecialchars($fromName) . ' <span style="color: #5f6368;">' . htmlspecialchars($fromEmail) . '</span>' : htmlspecialchars($fromEmail);
                 
+                // Calculate nesting level (older messages get more indented)
+                $nestingLevel = $index * 20;
+                $borderColor = $this->getNestingBorderColor($index);
+                
                 $content .= '
-    <div style="border-left: 3px solid #dadce0; padding-left: 16px; margin-bottom: 20px; position: relative;">
-        <div style="margin-bottom: 8px;">
-            <div style="display: flex; align-items: center; margin-bottom: 4px;">
-                <span style="font-weight: 500; color: #202124; font-size: 14px;">' . $senderDisplay . '</span>
-                <span style="margin: 0 8px; color: #5f6368; font-size: 12px;">•</span>
-                <span style="color: #5f6368; font-size: 12px;">' . htmlspecialchars($dateSent) . '</span>
+        <div style="margin-left: ' . $nestingLevel . 'px; border-left: 3px solid ' . $borderColor . '; padding-left: 16px; margin-bottom: 20px; position: relative; transition: all 0.2s ease;">
+            <div style="margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                    <span style="font-weight: 500; color: #202124; font-size: 14px;">' . $senderDisplay . '</span>
+                    <span style="margin: 0 8px; color: #5f6368; font-size: 12px;">•</span>
+                    <span style="color: #5f6368; font-size: 12px;">' . htmlspecialchars($dateSent) . '</span>
+                </div>
+                <div style="color: #202124; font-size: 14px; font-weight: 500; margin-bottom: 8px;">
+                    ' . htmlspecialchars($subject) . '
+                </div>
             </div>
-            <div style="color: #202124; font-size: 14px; font-weight: 500; margin-bottom: 8px;">
-                ' . htmlspecialchars($subject) . '
+            <div style="color: #3c4043; font-size: 14px; line-height: 1.5; background: #f8f9fa; border-radius: 8px; padding: 12px; border: 1px solid #e8eaed; position: relative;">
+                ' . $formattedContent . '
+                <div style="position: absolute; top: 8px; right: 8px; opacity: 0.6; font-size: 10px; color: #5f6368;">
+                    #' . ($index + 1) . '
+                </div>
             </div>
-        </div>
-        <div style="color: #3c4043; font-size: 14px; line-height: 1.5; background: #f8f9fa; border-radius: 8px; padding: 12px; border: 1px solid #e8eaed;">
-            ' . $formattedContent . '
-        </div>
-    </div>';
+        </div>';
             }
             
             $content .= '
-</div>';
+    </div>
+</div>
+
+<script>
+function toggleThread(threadId) {
+    const content = document.getElementById(threadId + "_content");
+    const icon = document.getElementById(threadId + "_icon");
+    
+    if (content.style.display === "none") {
+        content.style.display = "block";
+        icon.style.transform = "rotate(0deg)";
+    } else {
+        content.style.display = "none";
+        icon.style.transform = "rotate(-90deg)";
+    }
+}
+</script>';
             
             return $content;
         } catch (\Exception $e) {
             error_log('EmailThreads: buildThreadingContent - Error: ' . $e->getMessage());
             return '';
         }
+    }
+    
+    private function getNestingBorderColor(int $level): string
+    {
+        $colors = [
+            '#1a73e8', // Blue for first message
+            '#34a853', // Green for second message
+            '#ea4335', // Red for third message
+            '#fbbc04', // Yellow for fourth message
+            '#9aa0a6', // Gray for additional messages
+        ];
+        
+        return $colors[$level % count($colors)];
     }
     
     private function formatDate(string $dateString): string
