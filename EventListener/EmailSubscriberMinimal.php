@@ -84,9 +84,12 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
                 return;
             }
             
-            $testMessage = '<div style="margin: 20px 0; padding: 15px; background: #e3f2fd; border-left: 4px solid #2196f3; font-family: Arial, sans-serif;">
-                <strong style="color: #1976d2;">🔧 Email Threads Plugin Test (Minimal)</strong><br>
-                <span style="color: #424242; font-size: 14px;">This message confirms the Email Threads plugin is working. If you see this, the plugin is active and processing emails.</span>
+            $testMessage = '<div style="margin: 20px 0; padding: 12px; background: #f8f9fa; border: 1px solid #e8eaed; border-radius: 8px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif;">
+                <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                    <span style="color: #1a73e8; font-size: 16px; margin-right: 8px;">🔧</span>
+                    <strong style="color: #1a73e8; font-size: 14px; font-weight: 500;">Email Threads Plugin Active</strong>
+                </div>
+                <span style="color: #5f6368; font-size: 12px; line-height: 1.4;">Previous messages in this conversation will appear above this notice.</span>
             </div>';
             
             $newContent = $content . $testMessage;
@@ -219,8 +222,10 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             }
             
             $content = '
-<div style="margin: 20px 0; padding: 15px; background-color: #f5f5f5; border-left: 4px solid #666; font-family: Arial, sans-serif;">
-    <h4 style="color: #333; margin: 0 0 10px 0;">📧 Previous Messages in Thread</h4>';
+<div style="margin: 20px 0; border-top: 1px solid #e1e5e9; padding-top: 20px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif;">
+    <div style="color: #5f6368; font-size: 12px; font-weight: 500; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.3px;">
+        Previous Messages
+    </div>';
             
             foreach ($messages as $message) {
                 if (!is_array($message)) {
@@ -230,7 +235,7 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
                 $fromEmail = $message['from_email'] ?? 'Unknown';
                 $fromName = $message['from_name'] ?? '';
                 $subject = $message['subject'] ?? 'No Subject';
-                $dateSent = $message['date_sent'] ? date('Y-m-d H:i:s', strtotime($message['date_sent'])) : 'Unknown Date';
+                $dateSent = $message['date_sent'] ? $this->formatDate($message['date_sent']) : 'Unknown Date';
                 $messageContent = $message['content'] ?? '';
                 
                 // Ensure messageContent is a string
@@ -238,19 +243,26 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
                     $messageContent = '';
                 }
                 
-                // Truncate content if too long
-                if (strlen($messageContent) > 500) {
-                    $messageContent = substr($messageContent, 0, 500) . '...';
-                }
+                // Clean and format the content
+                $formattedContent = $this->formatMessageContent($messageContent);
+                
+                // Create sender display
+                $senderDisplay = $fromName ? htmlspecialchars($fromName) . ' <span style="color: #5f6368;">' . htmlspecialchars($fromEmail) . '</span>' : htmlspecialchars($fromEmail);
                 
                 $content .= '
-    <div style="border-left: 2px solid #ccc; padding-left: 15px; margin: 10px 0;">
-        <p style="margin: 5px 0; color: #666;"><strong>From:</strong> ' . htmlspecialchars($fromName ? $fromName . ' <' . $fromEmail . '>' : $fromEmail) . '</p>
-        <p style="margin: 5px 0; color: #666;"><strong>To:</strong> ' . htmlspecialchars($leadName) . '</p>
-        <p style="margin: 5px 0; color: #666;"><strong>Subject:</strong> ' . htmlspecialchars($subject) . '</p>
-        <p style="margin: 5px 0; color: #666;"><strong>Date:</strong> ' . htmlspecialchars($dateSent) . '</p>
-        <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 3px;">
-            ' . htmlspecialchars($messageContent) . '
+    <div style="border-left: 3px solid #dadce0; padding-left: 16px; margin-bottom: 20px; position: relative;">
+        <div style="margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                <span style="font-weight: 500; color: #202124; font-size: 14px;">' . $senderDisplay . '</span>
+                <span style="margin: 0 8px; color: #5f6368; font-size: 12px;">•</span>
+                <span style="color: #5f6368; font-size: 12px;">' . htmlspecialchars($dateSent) . '</span>
+            </div>
+            <div style="color: #202124; font-size: 14px; font-weight: 500; margin-bottom: 8px;">
+                ' . htmlspecialchars($subject) . '
+            </div>
+        </div>
+        <div style="color: #3c4043; font-size: 14px; line-height: 1.5; background: #f8f9fa; border-radius: 8px; padding: 12px; border: 1px solid #e8eaed;">
+            ' . $formattedContent . '
         </div>
     </div>';
             }
@@ -263,6 +275,69 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             error_log('EmailThreads: buildThreadingContent - Error: ' . $e->getMessage());
             return '';
         }
+    }
+    
+    private function formatDate(string $dateString): string
+    {
+        try {
+            $date = new \DateTime($dateString);
+            $now = new \DateTime();
+            $diff = $now->diff($date);
+            
+            if ($diff->days == 0) {
+                return $date->format('g:i A');
+            } elseif ($diff->days == 1) {
+                return 'Yesterday at ' . $date->format('g:i A');
+            } elseif ($diff->days < 7) {
+                return $date->format('l') . ' at ' . $date->format('g:i A');
+            } else {
+                return $date->format('M j, Y') . ' at ' . $date->format('g:i A');
+            }
+        } catch (\Exception $e) {
+            return date('M j, Y g:i A', strtotime($dateString));
+        }
+    }
+    
+    private function formatMessageContent(string $content): string
+    {
+        try {
+            // Remove HTML tags but preserve line breaks and basic formatting
+            $content = strip_tags($content, '<p><br><strong><em><u><a><ul><ol><li><h1><h2><h3><h4><h5><h6><blockquote><pre>');
+            
+            // Clean up excessive whitespace
+            $content = preg_replace('/\s+/', ' ', $content);
+            $content = preg_replace('/(<br\s*\/?>)+/', '<br>', $content);
+            
+            // Truncate if too long
+            if (strlen(strip_tags($content)) > 800) {
+                $content = $this->truncateHtml($content, 800);
+                $content .= '<br><br><em style="color: #5f6368; font-size: 12px;">... (message truncated)</em>';
+            }
+            
+            // Ensure proper line breaks
+            $content = nl2br($content);
+            
+            return $content;
+        } catch (\Exception $e) {
+            error_log('EmailThreads: formatMessageContent - Error: ' . $e->getMessage());
+            return htmlspecialchars(substr($content, 0, 500)) . (strlen($content) > 500 ? '...' : '');
+        }
+    }
+    
+    private function truncateHtml(string $html, int $limit): string
+    {
+        $text = strip_tags($html);
+        if (strlen($text) <= $limit) {
+            return $html;
+        }
+        
+        $truncated = substr($text, 0, $limit);
+        $lastSpace = strrpos($truncated, ' ');
+        if ($lastSpace !== false) {
+            $truncated = substr($truncated, 0, $lastSpace);
+        }
+        
+        return $truncated;
     }
     
     private function cleanSubject(string $subject): string
