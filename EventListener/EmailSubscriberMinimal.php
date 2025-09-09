@@ -168,10 +168,9 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
                 LIMIT 3
             ";
             
-            $stmt = $connection->prepare($sql);
-            $stmt->execute([$leadId]);
+            $result = $connection->executeQuery($sql, [$leadId]);
             $messages = [];
-            while ($row = $stmt->fetch()) {
+            while ($row = $result->fetch()) {
                 $messages[] = $row;
             }
             
