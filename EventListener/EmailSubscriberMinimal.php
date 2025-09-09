@@ -170,7 +170,7 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             
             $stmt = $connection->prepare($sql);
             $stmt->execute([$leadId]);
-            $messages = $stmt->fetchAllAssociative();
+            $messages = $stmt->fetchAll();
             
             error_log('EmailThreads: getPreviousMessages - Found ' . count($messages) . ' previous messages for lead: ' . $leadId);
             
