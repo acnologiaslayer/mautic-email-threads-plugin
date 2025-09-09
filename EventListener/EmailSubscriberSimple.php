@@ -116,14 +116,8 @@ class EmailSubscriberSimple implements EventSubscriberInterface
                 return;
             }
             
-            $testMessage = '<div style="margin: 20px 0; padding: 15px; background: #e3f2fd; border-left: 4px solid #2196f3; font-family: Arial, sans-serif;">
-                <span style="color: #424242; font-size: 14px;">This message confirms the Email Threads plugin is working. If you see this, the plugin is active and processing emails.</span>
-            </div>';
-            
-            $newContent = $content . $testMessage;
-            $event->setContent($newContent);
-            
-            error_log('EmailThreads: addSimpleTestMessage - Added simple test message to email');
+            // No test message added - threading is working properly
+            error_log('EmailThreads: addSimpleTestMessage - Skipped (no test message needed)');
         } catch (\Exception $e) {
             error_log('EmailThreads: addSimpleTestMessage - Error: ' . $e->getMessage());
         }
