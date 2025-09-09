@@ -56,6 +56,9 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             // Add simple test message
             $this->addSimpleTestMessage($event);
             
+            // Add simulated threading content
+            $this->addThreadingContent($event);
+            
         } catch (\Exception $e) {
             error_log('EmailThreads: onEmailSend - Error: ' . $e->getMessage());
             error_log('EmailThreads: onEmailSend - Stack trace: ' . $e->getTraceAsString());
@@ -82,6 +85,55 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             error_log('EmailThreads: addSimpleTestMessage - Added simple test message to email');
         } catch (\Exception $e) {
             error_log('EmailThreads: addSimpleTestMessage - Error: ' . $e->getMessage());
+        }
+    }
+    
+    private function addThreadingContent(EmailSendEvent $event): void
+    {
+        try {
+            $content = $event->getContent();
+            if (!$content) {
+                error_log('EmailThreads: addThreadingContent - No content to modify');
+                return;
+            }
+            
+            $email = $event->getEmail();
+            $leadData = $event->getLead();
+            
+            // Create simulated previous message
+            $leadName = 'Unknown';
+            if (is_array($leadData)) {
+                $leadName = trim(($leadData['firstname'] ?? '') . ' ' . ($leadData['lastname'] ?? ''));
+                if (empty($leadName)) {
+                    $leadName = $leadData['email'] ?? 'Unknown';
+                }
+            }
+            
+            $threadingContent = '
+<div style="margin: 20px 0; padding: 15px; background-color: #f5f5f5; border-left: 4px solid #666; font-family: Arial, sans-serif;">
+    <h4 style="color: #333; margin: 0 0 10px 0;">📧 Previous Messages in Thread</h4>
+    <div style="border-left: 2px solid #ccc; padding-left: 15px; margin: 10px 0;">
+        <p style="margin: 5px 0; color: #666;"><strong>From:</strong> support@example.com</p>
+        <p style="margin: 5px 0; color: #666;"><strong>To:</strong> ' . htmlspecialchars($leadName) . '</p>
+        <p style="margin: 5px 0; color: #666;"><strong>Subject:</strong> ' . htmlspecialchars($email ? $email->getSubject() : 'Previous Email') . '</p>
+        <p style="margin: 5px 0; color: #666;"><strong>Date:</strong> ' . date('Y-m-d H:i:s', strtotime('-1 day')) . '</p>
+        <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 3px;">
+            <p>This is a simulated previous message in the email thread.</p>
+            <p>Hello ' . htmlspecialchars($leadName) . ',</p>
+            <p>Thank you for your previous inquiry. This message demonstrates how email threading would work in the Email Threads plugin.</p>
+            <p>Best regards,<br>Support Team</p>
+        </div>
+    </div>
+</div>';
+            
+            // Add threading content before the test message
+            $currentContent = $event->getContent();
+            $newContent = $currentContent . $threadingContent;
+            $event->setContent($newContent);
+            
+            error_log('EmailThreads: addThreadingContent - Added threading content for lead: ' . $leadName);
+        } catch (\Exception $e) {
+            error_log('EmailThreads: addThreadingContent - Error: ' . $e->getMessage());
         }
     }
 }
