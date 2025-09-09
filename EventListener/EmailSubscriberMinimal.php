@@ -156,6 +156,20 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             // Clean subject for matching
             $cleanSubject = $this->cleanSubject($subject);
             
+            error_log('EmailThreads: getPreviousMessages - Looking for messages for lead: ' . $leadId . ', subject: ' . $subject);
+            
+            // First, let's check if there are any threads for this lead at all
+            $checkSql = "SELECT COUNT(*) as count FROM mt_EmailThread WHERE lead_id = ?";
+            $checkResult = $connection->executeQuery($checkSql, [$leadId]);
+            $threadCount = $checkResult->fetchColumn();
+            error_log('EmailThreads: getPreviousMessages - Found ' . $threadCount . ' threads for lead: ' . $leadId);
+            
+            // Check if there are any messages at all
+            $messageCheckSql = "SELECT COUNT(*) as count FROM mt_EmailThreadMessage etm JOIN mt_EmailThread et ON etm.thread_id = et.id WHERE et.lead_id = ?";
+            $messageCheckResult = $connection->executeQuery($messageCheckSql, [$leadId]);
+            $messageCount = $messageCheckResult->fetchColumn();
+            error_log('EmailThreads: getPreviousMessages - Found ' . $messageCount . ' messages for lead: ' . $leadId);
+            
             // Find previous messages for this lead with similar subject
             $sql = "
                 SELECT etm.*, et.thread_id, et.from_email, et.from_name
@@ -167,6 +181,8 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
                 ORDER BY etm.date_sent DESC
                 LIMIT 3
             ";
+            
+            error_log('EmailThreads: getPreviousMessages - Executing SQL: ' . $sql . ' with leadId: ' . $leadId);
             
             $result = $connection->executeQuery($sql, [$leadId]);
             $messages = [];
