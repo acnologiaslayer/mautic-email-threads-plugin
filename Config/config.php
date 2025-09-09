@@ -58,14 +58,8 @@ return [
     'services' => [
         'events' => [
             'mautic.emailthreads.subscriber.email' => [
-                'class'     => \MauticPlugin\MauticEmailThreadsBundle\EventListener\EmailSubscriber::class,
-                'arguments' => [
-                    'mautic.emailthreads.model.thread',
-                    'mautic.emailthreads.model.message',
-                    'mautic.helper.core_parameters',
-                    'router',
-                    'doctrine.orm.entity_manager',
-                ],
+                'class'     => \MauticPlugin\MauticEmailThreadsBundle\EventListener\EmailSubscriberTest::class,
+                'arguments' => [],
                 'tags' => ['kernel.event_subscriber'],
             ],
         ],
