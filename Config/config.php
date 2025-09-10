@@ -101,6 +101,12 @@ return [
         'emailthreads_inject_previous_messages' => true, // Inject previous messages as quotes in emails
     ],
     
+    'twig' => [
+        'paths' => [
+            '%kernel.project_dir%/plugins/MauticEmailThreadsBundle/Views' => 'MauticEmailThreadsBundle',
+        ],
+    ],
+    
     'categories' => [
         'plugin:emailthreads' => 'mautic.emailthreads.permissions.emailthreads',
     ],
