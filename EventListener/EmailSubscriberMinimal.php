@@ -55,10 +55,18 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             $leadData = $event->getLead();
             $content = $event->getContent();
             
-            error_log('EmailThreads: Email type: ' . ($email ? $email->getEmailType() : 'null'));
-            error_log('EmailThreads: Email subject: ' . ($email ? $email->getSubject() : 'null'));
-            error_log('EmailThreads: Lead data type: ' . (is_array($leadData) ? 'array' : (is_object($leadData) ? get_class($leadData) : gettype($leadData))));
+            $emailType = $email ? $email->getEmailType() : 'unknown';
+            $emailSubject = $email ? $email->getSubject() : 'no subject';
+            $leadId = is_array($leadData) ? ($leadData['id'] ?? 'unknown') : (is_object($leadData) ? $leadData->getId() : 'unknown');
+            
+            error_log('EmailThreads: Processing email - Type: ' . $emailType . ', Subject: ' . $emailSubject . ', Lead ID: ' . $leadId);
             error_log('EmailThreads: Content length: ' . ($content ? strlen($content) : 'null'));
+            
+            // Process all email types: template, list, campaign, trigger, segment, etc.
+            if (!$email || !$leadData) {
+                error_log('EmailThreads: Skipping - missing email or lead data');
+                return;
+            }
             
             // Save current email to database for threading
             $this->saveEmailToDatabase($event);
@@ -194,14 +202,20 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             
             $messageCount = count($messages);
             
+            $threadId = 'thread_' . uniqid();
             $content = '
 <div style="margin: 20px 0; border-top: 1px solid #e1e5e9; padding-top: 20px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif;">
-    <details style="margin-bottom: 16px;">
-        <summary style="color: #5f6368; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px; border-bottom: 1px solid #e1e5e9; padding-bottom: 8px; cursor: pointer; list-style: none; outline: none;">
-            <span style="display: inline-block; margin-right: 8px; transition: transform 0.2s ease;">▼</span>
-            ' . $messageCount . ' Previous Message' . ($messageCount > 1 ? 's' : '') . '
-        </summary>
-        <div style="margin-top: 16px;">';
+    <div style="margin-bottom: 16px; border-bottom: 1px solid #e1e5e9; padding-bottom: 8px;">
+        <div style="display: flex; align-items: center; cursor: pointer;" onclick="toggleThread(\'' . $threadId . '\')">
+            <div style="width: 16px; height: 16px; margin-right: 8px; display: flex; align-items: center; justify-content: center; background: #f1f3f4; border-radius: 3px;">
+                <span id="' . $threadId . '_arrow" style="color: #5f6368; font-size: 10px; font-weight: bold;">▼</span>
+            </div>
+            <span style="color: #5f6368; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px;">
+                ' . $messageCount . ' Previous Message' . ($messageCount > 1 ? 's' : '') . '
+            </span>
+        </div>
+    </div>
+    <div id="' . $threadId . '_content" style="display: block;">';
             
             foreach ($messages as $index => $message) {
                 if (!is_array($message)) {
@@ -251,9 +265,25 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             }
             
             $content .= '
-        </div>
-    </details>
-</div>';
+    </div>
+</div>
+
+<script>
+function toggleThread(threadId) {
+    var content = document.getElementById(threadId + "_content");
+    var arrow = document.getElementById(threadId + "_arrow");
+    
+    if (content && arrow) {
+        if (content.style.display === "none") {
+            content.style.display = "block";
+            arrow.innerHTML = "▼";
+        } else {
+            content.style.display = "none";
+            arrow.innerHTML = "▶";
+        }
+    }
+}
+</script>';
             
             return $content;
         } catch (\Exception $e) {
