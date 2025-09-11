@@ -221,20 +221,16 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             
             $messageCount = count($messages);
             
-            $threadId = 'thread_' . uniqid();
             $content = '
 <div style="margin: 20px 0; border-top: 1px solid #e1e5e9; padding-top: 20px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif;">
-    <div style="margin-bottom: 16px; border-bottom: 1px solid #e1e5e9; padding-bottom: 8px;">
-        <div style="display: flex; align-items: center; cursor: pointer;" onclick="toggleThread(\'' . $threadId . '\')">
+    <details style="margin-bottom: 16px;">
+        <summary style="color: #5f6368; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px; border-bottom: 1px solid #e1e5e9; padding-bottom: 8px; cursor: pointer; list-style: none; outline: none; display: flex; align-items: center;">
             <div style="width: 16px; height: 16px; margin-right: 8px; display: flex; align-items: center; justify-content: center; background: #f1f3f4; border-radius: 3px;">
-                <span id="' . $threadId . '_arrow" style="color: #5f6368; font-size: 10px; font-weight: bold;">▼</span>
+                <span style="color: #5f6368; font-size: 10px; font-weight: bold;">▼</span>
             </div>
-            <span style="color: #5f6368; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px;">
-                ' . $messageCount . ' Previous Message' . ($messageCount > 1 ? 's' : '') . '
-            </span>
-        </div>
-    </div>
-    <div id="' . $threadId . '_content" style="display: block;">';
+            ' . $messageCount . ' Previous Message' . ($messageCount > 1 ? 's' : '') . '
+        </summary>
+        <div style="margin-top: 16px;">';
             
             foreach ($messages as $index => $message) {
                 if (!is_array($message)) {
@@ -284,25 +280,9 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             }
             
             $content .= '
-    </div>
-</div>
-
-<script>
-function toggleThread(threadId) {
-    var content = document.getElementById(threadId + "_content");
-    var arrow = document.getElementById(threadId + "_arrow");
-    
-    if (content && arrow) {
-        if (content.style.display === "none") {
-            content.style.display = "block";
-            arrow.innerHTML = "▼";
-        } else {
-            content.style.display = "none";
-            arrow.innerHTML = "▶";
-        }
-    }
-}
-</script>';
+        </div>
+    </details>
+</div>';
             
             return $content;
         } catch (\Exception $e) {
@@ -348,15 +328,12 @@ function toggleThread(threadId) {
     private function formatMessageContent(string $content): string
     {
         try {
-            // Remove signatures (common patterns)
-            $content = preg_replace('/\n\s*--\s*\n.*$/s', '', $content); // Remove -- signature
-            $content = preg_replace('/\n\s*Best regards?.*$/s', '', $content); // Remove "Best regards" signatures
-            $content = preg_replace('/\n\s*Sincerely.*$/s', '', $content); // Remove "Sincerely" signatures
-            $content = preg_replace('/\n\s*Thanks?.*$/s', '', $content); // Remove "Thanks" signatures
-            $content = preg_replace('/\n\s*Regards.*$/s', '', $content); // Remove "Regards" signatures
+            // Remove only email client signatures (not user signatures)
             $content = preg_replace('/\n\s*Sent from.*$/s', '', $content); // Remove "Sent from" signatures
             $content = preg_replace('/\n\s*Get Outlook.*$/s', '', $content); // Remove Outlook signatures
             $content = preg_replace('/\n\s*Get Gmail.*$/s', '', $content); // Remove Gmail signatures
+            $content = preg_replace('/\n\s*Sent via.*$/s', '', $content); // Remove "Sent via" signatures
+            $content = preg_replace('/\n\s*This email was sent.*$/s', '', $content); // Remove "This email was sent" signatures
             
             // Remove all CSS attributes and style tags completely
             $content = preg_replace('/style\s*=\s*["\'][^"\']*["\']/', '', $content);
