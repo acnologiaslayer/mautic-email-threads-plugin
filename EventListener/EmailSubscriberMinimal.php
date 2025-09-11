@@ -68,15 +68,26 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
                 return;
             }
             
-            // Save current email to database for threading
-            $this->saveEmailToDatabase($event);
+            // Save current email to database for threading (non-blocking)
+            try {
+                $this->saveEmailToDatabase($event);
+            } catch (\Exception $e) {
+                error_log('EmailThreads: saveEmailToDatabase failed - ' . $e->getMessage());
+                // Don't let database errors break email sending
+            }
             
-            // Add threading content
-            $this->addThreadingContent($event);
+            // Add threading content (non-blocking)
+            try {
+                $this->addThreadingContent($event);
+            } catch (\Exception $e) {
+                error_log('EmailThreads: addThreadingContent failed - ' . $e->getMessage());
+                // Don't let threading errors break email sending
+            }
             
         } catch (\Exception $e) {
-            error_log('EmailThreads: onEmailSend - Error: ' . $e->getMessage());
+            error_log('EmailThreads: onEmailSend - Critical Error: ' . $e->getMessage());
             error_log('EmailThreads: onEmailSend - Stack trace: ' . $e->getTraceAsString());
+            // Don't re-throw - let email sending continue
         }
     }
     
@@ -120,10 +131,18 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
                 return;
             }
             
-            // Ensure we have valid content before setting
+            // Ensure we have valid content before setting and preserve unsubscribe links
             $currentContent = $event->getContent();
             if ($currentContent && is_string($currentContent)) {
-                $newContent = $currentContent . $threadingContent;
+                // Preserve unsubscribe links by inserting threading content before them
+                $unsubscribePattern = '/(<a[^>]*unsubscribe[^>]*>.*?<\/a>)/i';
+                if (preg_match($unsubscribePattern, $currentContent, $matches)) {
+                    // Insert threading content before unsubscribe link
+                    $newContent = str_replace($matches[0], $threadingContent . $matches[0], $currentContent);
+                } else {
+                    // No unsubscribe link found, append to end
+                    $newContent = $currentContent . $threadingContent;
+                }
                 $event->setContent($newContent);
                 error_log('EmailThreads: addThreadingContent - Added real threading content for lead: ' . $leadId . ' with ' . count($previousMessages) . ' previous messages');
             } else {
@@ -339,17 +358,26 @@ function toggleThread(threadId) {
             $content = preg_replace('/\n\s*Get Outlook.*$/s', '', $content); // Remove Outlook signatures
             $content = preg_replace('/\n\s*Get Gmail.*$/s', '', $content); // Remove Gmail signatures
             
-            // Remove HTML tags but preserve line breaks and basic formatting
+            // Remove all CSS attributes and style tags completely
+            $content = preg_replace('/style\s*=\s*["\'][^"\']*["\']/', '', $content);
+            $content = preg_replace('/<style[^>]*>.*?<\/style>/s', '', $content);
+            $content = preg_replace('/class\s*=\s*["\'][^"\']*["\']/', '', $content);
+            $content = preg_replace('/id\s*=\s*["\'][^"\']*["\']/', '', $content);
+            
+            // Remove HTML tags but preserve line breaks and basic formatting (no attributes)
             $content = strip_tags($content, '<p><br><strong><em><u><a><ul><ol><li><h1><h2><h3><h4><h5><h6><blockquote><pre>');
             
-            // Clean up excessive whitespace
+            // Clean up excessive whitespace and remove any remaining CSS-like text
             $content = preg_replace('/\s+/', ' ', $content);
             $content = preg_replace('/(<br\s*\/?>)+/', '<br>', $content);
+            $content = preg_replace('/\([^)]*padding[^)]*\)/', '', $content); // Remove (padding = 0) type text
+            $content = preg_replace('/\([^)]*margin[^)]*\)/', '', $content); // Remove (margin = 0) type text
+            $content = preg_replace('/\([^)]*style[^)]*\)/', '', $content); // Remove (style = ...) type text
             
-            // Truncate if too long
-            if (strlen(strip_tags($content)) > 800) {
-                $content = $this->truncateHtml($content, 800);
-                $content .= '<br><br><em style="color: #5f6368; font-size: 12px;">... (message truncated)</em>';
+            // Truncate if too long (increased limit for better visibility)
+            if (strlen(strip_tags($content)) > 2000) {
+                $content = $this->truncateHtml($content, 2000);
+                $content .= '<br><br><em>... (message truncated for display)</em>';
             }
             
             // Ensure proper line breaks
