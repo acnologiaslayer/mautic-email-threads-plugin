@@ -133,7 +133,7 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             
             // Ensure we have valid content before setting and preserve unsubscribe links
             $currentContent = $event->getContent();
-            if ($currentContent && is_string($currentContent)) {
+            if ($currentContent && is_string($currentContent) && !empty(trim($currentContent))) {
                 // Preserve unsubscribe links by inserting threading content before them
                 $unsubscribePattern = '/(<a[^>]*unsubscribe[^>]*>.*?<\/a>)/i';
                 if (preg_match($unsubscribePattern, $currentContent, $matches)) {
@@ -143,10 +143,16 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
                     // No unsubscribe link found, append to end
                     $newContent = $currentContent . $threadingContent;
                 }
-                $event->setContent($newContent);
-                error_log('EmailThreads: addThreadingContent - Added real threading content for lead: ' . $leadId . ' with ' . count($previousMessages) . ' previous messages');
+                
+                // Validate the new content before setting it
+                if ($newContent && is_string($newContent) && !empty(trim($newContent))) {
+                    $event->setContent($newContent);
+                    error_log('EmailThreads: addThreadingContent - Added real threading content for lead: ' . $leadId . ' with ' . count($previousMessages) . ' previous messages');
+                } else {
+                    error_log('EmailThreads: addThreadingContent - Generated content is invalid, skipping modification');
+                }
             } else {
-                error_log('EmailThreads: addThreadingContent - Current content is invalid, skipping modification');
+                error_log('EmailThreads: addThreadingContent - Current content is invalid or empty, skipping modification');
             }
         } catch (\Exception $e) {
             error_log('EmailThreads: addThreadingContent - Error: ' . $e->getMessage());
