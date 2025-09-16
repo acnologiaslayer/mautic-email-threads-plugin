@@ -116,7 +116,7 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             }
             
             // Try to find previous messages for this lead
-            $previousMessages = $this->getPreviousMessages($leadId, $email->getSubject());
+            $previousMessages = $this->getPreviousMessages((int) $leadId, $email->getSubject());
             
             if (empty($previousMessages)) {
                 error_log('EmailThreads: addThreadingContent - No previous messages found for lead: ' . $leadId);
