@@ -43,17 +43,6 @@ return [
         ],
     ],
     
-    'menu' => [
-        'main' => [
-            'items' => [
-                'Email Threads' => [
-                    'route'    => 'mautic_emailthreads_index',
-                    'parent'   => 'mautic.core.channels',
-                    'priority' => 65,
-                ],
-            ],
-        ],
-    ],
     
     'services' => [
         'events' => [
