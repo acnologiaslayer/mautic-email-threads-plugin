@@ -1,5 +1,8 @@
 -- EmailThreads Plugin Database Tables
 -- Run this script to create the required tables for the EmailThreads plugin
+-- 
+-- NOTE: This script uses 'mt_' prefix by default. For custom prefixes,
+-- use the install_mautic6.php script which auto-detects the prefix.
 
 -- Create email_threads table
 CREATE TABLE IF NOT EXISTS `mt_EmailThread` (

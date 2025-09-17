@@ -4,6 +4,12 @@
  * 
  * This script creates the required database tables and configuration
  * for the EmailThreads plugin in Mautic 6.0.3
+ * 
+ * Features:
+ * - Idempotent: Safe to run multiple times
+ * - Auto-detects table prefix from existing Mautic tables
+ * - Preserves existing data
+ * - Handles all Mautic installation types
  */
 
 // Get database connection details from environment variables
@@ -19,6 +25,49 @@ echo "Database Host: $dbHost\n";
 echo "Database Name: $dbName\n";
 echo "Database User: $dbUser\n\n";
 
+/**
+ * Detect table prefix from existing Mautic tables
+ */
+function detectTablePrefix($pdo) {
+    // Common Mautic table names to check for prefix
+    $commonTables = ['users', 'leads', 'emails', 'campaigns', 'assets', 'categories'];
+    
+    foreach ($commonTables as $table) {
+        // Check for table with 'mt_' prefix (most common)
+        $stmt = $pdo->query("SHOW TABLES LIKE 'mt_$table'");
+        if ($stmt->rowCount() > 0) {
+            return 'mt_';
+        }
+        
+        // Check for table without prefix
+        $stmt = $pdo->query("SHOW TABLES LIKE '$table'");
+        if ($stmt->rowCount() > 0) {
+            return '';
+        }
+        
+        // Check for other common prefixes
+        $prefixes = ['mautic_', 'mautic', 'mt'];
+        foreach ($prefixes as $prefix) {
+            $stmt = $pdo->query("SHOW TABLES LIKE '{$prefix}_{$table}'");
+            if ($stmt->rowCount() > 0) {
+                return $prefix . '_';
+            }
+        }
+    }
+    
+    // Default to 'mt_' if no tables found
+    return 'mt_';
+}
+
+/**
+ * Check if plugin is already installed
+ */
+function isPluginInstalled($pdo, $prefix) {
+    $emailThreadTable = $prefix . 'EmailThread';
+    $stmt = $pdo->query("SHOW TABLES LIKE '$emailThreadTable'");
+    return $stmt->rowCount() > 0;
+}
+
 try {
     // Create PDO connection
     $dsn = "mysql:host=$dbHost;port=$dbPort;dbname=$dbName;charset=utf8mb4";
@@ -29,15 +78,28 @@ try {
     
     echo "✓ Connected to database successfully\n";
     
-    // Check if mt_config table exists
-    $checkConfigTable = "SHOW TABLES LIKE 'mt_config'";
+    // Detect table prefix
+    $prefix = detectTablePrefix($pdo);
+    echo "✓ Detected table prefix: '" . ($prefix ?: 'none') . "'\n";
+    
+    // Check if plugin is already installed
+    if (isPluginInstalled($pdo, $prefix)) {
+        echo "✓ EmailThreads plugin is already installed\n";
+        echo "✓ Installation is idempotent - no changes needed\n";
+        echo "\n🎉 Plugin is ready to use!\n";
+        exit(0);
+    }
+    
+    // Check if config table exists (with detected prefix)
+    $configTable = $prefix . 'config';
+    $checkConfigTable = "SHOW TABLES LIKE '$configTable'";
     $stmt = $pdo->query($checkConfigTable);
     $configTableExists = $stmt->rowCount() > 0;
     
     if (!$configTableExists) {
-        echo "Creating mt_config table...\n";
+        echo "Creating $configTable table...\n";
         $createConfigTable = "
-            CREATE TABLE `mt_config` (
+            CREATE TABLE `$configTable` (
                 `id` int(11) NOT NULL AUTO_INCREMENT,
                 `param` varchar(255) NOT NULL,
                 `value` longtext,
@@ -54,15 +116,16 @@ try {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ";
         $pdo->exec($createConfigTable);
-        echo "✓ Created mt_config table\n";
+        echo "✓ Created $configTable table\n";
     } else {
-        echo "✓ mt_config table already exists\n";
+        echo "✓ $configTable table already exists\n";
     }
     
     // Create EmailThread table
-    echo "Creating mt_EmailThread table...\n";
+    $emailThreadTable = $prefix . 'EmailThread';
+    echo "Creating $emailThreadTable table...\n";
     $createEmailThreadTable = "
-        CREATE TABLE IF NOT EXISTS `mt_EmailThread` (
+        CREATE TABLE IF NOT EXISTS `$emailThreadTable` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
             `thread_id` varchar(255) NOT NULL,
             `lead_id` int(11) NOT NULL,
@@ -90,12 +153,13 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ";
     $pdo->exec($createEmailThreadTable);
-    echo "✓ Created mt_EmailThread table\n";
+    echo "✓ Created $emailThreadTable table\n";
     
     // Create EmailThreadMessage table
-    echo "Creating mt_EmailThreadMessage table...\n";
+    $emailThreadMessageTable = $prefix . 'EmailThreadMessage';
+    echo "Creating $emailThreadMessageTable table...\n";
     $createEmailThreadMessageTable = "
-        CREATE TABLE IF NOT EXISTS `mt_EmailThreadMessage` (
+        CREATE TABLE IF NOT EXISTS `$emailThreadMessageTable` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
             `thread_id` int(11) NOT NULL,
             `email_stat_id` int(11) DEFAULT NULL,
@@ -118,11 +182,11 @@ try {
             KEY `date_modified` (`date_modified`),
             KEY `created_by` (`created_by`),
             KEY `modified_by` (`modified_by`),
-            CONSTRAINT `FK_EmailThreadMessage_thread` FOREIGN KEY (`thread_id`) REFERENCES `mt_EmailThread` (`id`) ON DELETE CASCADE
+            CONSTRAINT `FK_EmailThreadMessage_thread` FOREIGN KEY (`thread_id`) REFERENCES `$emailThreadTable` (`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ";
     $pdo->exec($createEmailThreadMessageTable);
-    echo "✓ Created mt_EmailThreadMessage table\n";
+    echo "✓ Created $emailThreadMessageTable table\n";
     
     // Insert default configuration
     echo "Inserting default configuration...\n";
@@ -137,7 +201,7 @@ try {
     
     foreach ($configValues as $param => $value) {
         $insertConfig = "
-            INSERT INTO mt_config (param, value, date_added, date_modified) 
+            INSERT INTO $configTable (param, value, date_added, date_modified) 
             VALUES (?, ?, NOW(), NOW())
             ON DUPLICATE KEY UPDATE value = VALUES(value), date_modified = NOW()
         ";
@@ -150,7 +214,7 @@ try {
     echo "\nVerifying installation...\n";
     
     // Check tables exist
-    $tables = ['mt_EmailThread', 'mt_EmailThreadMessage', 'mt_config'];
+    $tables = [$emailThreadTable, $emailThreadMessageTable, $configTable];
     foreach ($tables as $table) {
         $checkTable = "SHOW TABLES LIKE '$table'";
         $stmt = $pdo->query($checkTable);
@@ -162,7 +226,7 @@ try {
     }
     
     // Check configuration
-    $checkConfig = "SELECT COUNT(*) as count FROM mt_config WHERE param LIKE 'emailthreads_%'";
+    $checkConfig = "SELECT COUNT(*) as count FROM $configTable WHERE param LIKE 'emailthreads_%'";
     $stmt = $pdo->query($checkConfig);
     $configCount = $stmt->fetchColumn();
     echo "✓ Found $configCount EmailThreads configuration entries\n";

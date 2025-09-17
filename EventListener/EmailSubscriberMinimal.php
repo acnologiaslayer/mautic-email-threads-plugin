@@ -176,17 +176,22 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
                 \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
             ]);
             
-            error_log('EmailThreads: getPreviousMessages - Looking for messages for lead: ' . $leadId . ', subject: ' . $subject);
+            // Detect table prefix
+            $prefix = $this->detectTablePrefix($pdo);
+            $emailThreadTable = $prefix . 'EmailThread';
+            $emailThreadMessageTable = $prefix . 'EmailThreadMessage';
+            
+            error_log('EmailThreads: getPreviousMessages - Looking for messages for lead: ' . $leadId . ', subject: ' . $subject . ', using prefix: ' . $prefix);
             
             // First, let's check if there are any threads for this lead at all
-            $checkSql = "SELECT COUNT(*) as count FROM mt_EmailThread WHERE lead_id = ?";
+            $checkSql = "SELECT COUNT(*) as count FROM $emailThreadTable WHERE lead_id = ?";
             $stmt = $pdo->prepare($checkSql);
             $stmt->execute([$leadId]);
             $threadCount = $stmt->fetchColumn();
             error_log('EmailThreads: getPreviousMessages - Found ' . $threadCount . ' threads for lead: ' . $leadId);
             
             // Check if there are any messages at all
-            $messageCheckSql = "SELECT COUNT(*) as count FROM mt_EmailThreadMessage etm JOIN mt_EmailThread et ON etm.thread_id = et.id WHERE et.lead_id = ?";
+            $messageCheckSql = "SELECT COUNT(*) as count FROM $emailThreadMessageTable etm JOIN $emailThreadTable et ON etm.thread_id = et.id WHERE et.lead_id = ?";
             $stmt = $pdo->prepare($messageCheckSql);
             $stmt->execute([$leadId]);
             $messageCount = $stmt->fetchColumn();
@@ -195,8 +200,8 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             // Find previous messages for this lead with similar subject
             $sql = "
                 SELECT etm.*, et.thread_id, et.from_email, et.from_name
-                FROM mt_EmailThreadMessage etm
-                JOIN mt_EmailThread et ON etm.thread_id = et.id
+                FROM $emailThreadMessageTable etm
+                JOIN $emailThreadTable et ON etm.thread_id = et.id
                 WHERE et.lead_id = ? 
                 AND et.is_active = 1
                 AND etm.date_sent < NOW()
@@ -427,11 +432,16 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
                 \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
             ]);
             
+            // Detect table prefix
+            $prefix = $this->detectTablePrefix($pdo);
+            $emailThreadTable = $prefix . 'EmailThread';
+            $emailThreadMessageTable = $prefix . 'EmailThreadMessage';
+            
             // Generate thread ID
             $threadId = 'thread_' . $leadId . '_' . md5($subject . $leadId);
             
             // Check if thread exists
-            $checkThreadSql = "SELECT id FROM mt_EmailThread WHERE thread_id = ? AND lead_id = ?";
+            $checkThreadSql = "SELECT id FROM $emailThreadTable WHERE thread_id = ? AND lead_id = ?";
             $stmt = $pdo->prepare($checkThreadSql);
             $stmt->execute([$threadId, $leadId]);
             $existingThread = $stmt->fetch();
@@ -443,7 +453,7 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             } else {
                 // Create new thread
                 $createThreadSql = "
-                    INSERT INTO mt_EmailThread (thread_id, lead_id, subject, from_email, from_name, first_message_date, last_message_date, is_active, date_added, date_modified)
+                    INSERT INTO $emailThreadTable (thread_id, lead_id, subject, from_email, from_name, first_message_date, last_message_date, is_active, date_added, date_modified)
                     VALUES (?, ?, ?, ?, ?, NOW(), NOW(), 1, NOW(), NOW())
                 ";
                 $stmt = $pdo->prepare($createThreadSql);
@@ -454,7 +464,7 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             
             // Save message
             $saveMessageSql = "
-                INSERT INTO mt_EmailThreadMessage (thread_id, subject, content, from_email, from_name, date_sent, email_type, date_added, date_modified)
+                INSERT INTO $emailThreadMessageTable (thread_id, subject, content, from_email, from_name, date_sent, email_type, date_added, date_modified)
                 VALUES (?, ?, ?, ?, ?, NOW(), 'sent', NOW(), NOW())
             ";
             $stmt = $pdo->prepare($saveMessageSql);
@@ -466,5 +476,40 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
         } catch (\Exception $e) {
             error_log('EmailThreads: saveEmailToDatabase - Error: ' . $e->getMessage());
         }
+    }
+    
+    /**
+     * Detect table prefix from existing Mautic tables
+     */
+    private function detectTablePrefix(\PDO $pdo): string
+    {
+        // Common Mautic table names to check for prefix
+        $commonTables = ['users', 'leads', 'emails', 'campaigns', 'assets', 'categories'];
+        
+        foreach ($commonTables as $table) {
+            // Check for table with 'mt_' prefix (most common)
+            $stmt = $pdo->query("SHOW TABLES LIKE 'mt_$table'");
+            if ($stmt->rowCount() > 0) {
+                return 'mt_';
+            }
+            
+            // Check for table without prefix
+            $stmt = $pdo->query("SHOW TABLES LIKE '$table'");
+            if ($stmt->rowCount() > 0) {
+                return '';
+            }
+            
+            // Check for other common prefixes
+            $prefixes = ['mautic_', 'mautic', 'mt'];
+            foreach ($prefixes as $prefix) {
+                $stmt = $pdo->query("SHOW TABLES LIKE '{$prefix}_{$table}'");
+                if ($stmt->rowCount() > 0) {
+                    return $prefix . '_';
+                }
+            }
+        }
+        
+        // Default to 'mt_' if no tables found
+        return 'mt_';
     }
 }
