@@ -10,25 +10,6 @@ return [
     'contact'     => 'arc.mahir@gmail.com',
     
     'routes' => [
-        'main' => [
-            'mautic_emailthreads_index' => [
-                'path'       => '/emailthreads',
-                'controller' => 'MauticPlugin\MauticEmailThreadsBundle\Controller\DefaultController::indexAction',
-            ],
-            'mautic_emailthreads_view' => [
-                'path'       => '/emailthreads/view/{id}',
-                'controller' => 'MauticPlugin\MauticEmailThreadsBundle\Controller\DefaultController::viewAction',
-                'requirements' => ['id' => '\d+'],
-            ],
-            'mautic_emailthreads_config' => [
-                'path'       => '/emailthreads/config',
-                'controller' => 'MauticPlugin\MauticEmailThreadsBundle\Controller\DefaultController::configAction',
-            ],
-            'mautic_emailthreads_cleanup' => [
-                'path'       => '/emailthreads/cleanup',
-                'controller' => 'MauticPlugin\MauticEmailThreadsBundle\Controller\DefaultController::cleanupAction',
-            ],
-        ],
         'public' => [
             'mautic_emailthreads_public' => [
                 'path'       => '/email-thread/{threadId}',
@@ -50,12 +31,6 @@ return [
                 'class'     => \MauticPlugin\MauticEmailThreadsBundle\EventListener\EmailSubscriberMinimal::class,
                 'arguments' => ['doctrine.orm.entity_manager'],
                 'tags' => ['kernel.event_subscriber'],
-            ],
-        ],
-        'forms' => [
-            'mautic.emailthreads.form.type.config' => [
-                'class' => \MauticPlugin\MauticEmailThreadsBundle\Form\Type\ConfigType::class,
-                'tags' => ['form.type'],
             ],
         ],
         'models' => [
@@ -96,17 +71,4 @@ return [
         ],
     ],
     
-    'categories' => [
-        'plugin:emailthreads' => 'mautic.emailthreads.permissions.emailthreads',
-    ],
-    
-    'permissions' => [
-        'plugin:emailthreads' => [
-            'emailthreads:threads:view'   => 'mautic.core.permissions.view',
-            'emailthreads:threads:create' => 'mautic.core.permissions.create',
-            'emailthreads:threads:edit'   => 'mautic.core.permissions.edit',
-            'emailthreads:threads:delete' => 'mautic.core.permissions.delete',
-            'emailthreads:config:manage'  => 'mautic.emailthreads.permissions.config',
-        ],
-    ],
 ];

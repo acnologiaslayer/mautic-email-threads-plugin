@@ -1,324 +1,212 @@
 # Mautic Email Threads Plugin
 
-A comprehensive plugin for **Mautic 5.x** that enables email threading functionality, allowing emails sent to leads to be displayed as conversation threads on the recipient's end. Works with all email types including one-to-one, campaigns, and broadcasts.
+A lightweight plugin for **Mautic 6.0.3+** that enables email threading functionality, automatically displaying previous messages in new emails sent to contacts. Works seamlessly with all email types including campaigns, templates, broadcasts, and trigger emails.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Mautic](https://img.shields.io/badge/mautic-5.x-orange.svg)
+![Mautic](https://img.shields.io/badge/mautic-6.0.3+-orange.svg)
 ![PHP](https://img.shields.io/badge/php-8.1+-blue.svg)
-![Symfony](https://img.shields.io/badge/symfony-7.3-green.svg)
+![Symfony](https://img.shields.io/badge/symfony-7.3+-green.svg)
 
 ## ✨ Features
 
-- ✅ **Universal Email Threading**: Works with all Mautic email types
-- ✅ **Automatic Thread Creation**: Groups emails by contact and subject
+- ✅ **Automatic Email Threading**: Automatically displays previous messages in new emails
+- ✅ **Gmail/Outlook Style**: Collapsible previous messages with nesting and rich formatting
+- ✅ **Universal Compatibility**: Works with all Mautic email types (campaigns, templates, broadcasts, triggers)
 - ✅ **Public Thread View**: Shareable URLs for email conversations  
 - ✅ **Embed Support**: Embeddable threads for external websites
 - ✅ **Responsive Design**: Mobile-friendly interface
-- ✅ **Admin Interface**: Complete management panel
-- ✅ **Modern Architecture**: Built for Mautic 5.x with modern PHP practices
-- ✅ **Content Cleaning**: Removes tracking pixels for clean display
-- ✅ **Security Features**: XSS protection and secure access
+- ✅ **Auto-Detection**: Automatically detects table prefix from your Mautic installation
+- ✅ **Idempotent Installation**: Safe to run multiple times without breaking functionality
+- ✅ **Content Cleaning**: Removes email client signatures and cleans HTML
+- ✅ **Non-Blocking**: Won't break email sending if there are any errors
 
 ## 📋 Requirements
 
-- **Mautic 5.x** or higher
+- **Mautic 6.0.3** or higher
 - **PHP 8.1** or higher  
 - **Symfony 7.3** or higher
 - **MySQL 5.7+** or **MariaDB 10.2+**
 
 ## 🚀 Installation
 
-### Direct Installation
+### Quick Installation (Recommended)
 
-1. **Download** or clone this repository
-2. **Copy the plugin** to your Mautic installation:
+1. **Copy the plugin** to your Mautic installation:
    ```bash
    cp -r MauticEmailThreadsBundle /path/to/mautic/plugins/
    ```
 
-3. **Set proper permissions**:
+2. **Run the installation script**:
    ```bash
-   cd /path/to/mautic
-   chown -R www-data:www-data plugins/MauticEmailThreadsBundle/
-   chmod -R 755 plugins/MauticEmailThreadsBundle/
+   cd /path/to/mautic/plugins/MauticEmailThreadsBundle
+   ./install.sh
    ```
 
-4. **Clear Mautic cache**:
+3. **Clear Mautic cache**:
    ```bash
-   php bin/console cache:clear --env=prod
+   php /var/www/html/bin/console cache:clear
    ```
 
-5. **Install the plugin** through Mautic admin:
-   - Go to **Settings → Plugins**
-   - Find "Email Threads" and click **Install/Upgrade**
-   - Configure the plugin settings
-
-## ⚡ What's New in This Version
-
-This plugin has been completely updated for **Mautic 5.x** with:
-
-- **Modern PHP 8.1+** with strict typing and attributes
-- **Doctrine ORM attributes** instead of legacy metadata methods
-- **Twig templates** instead of PHP templates
-- **Dependency injection** in controllers
-- **Event-driven architecture** with proper subscribers
-- **Security enhancements** and permission integration
-- **Responsive Twig-based** admin interface
-- **Database Integration**: Full integration with Mautic's database system
-- **Event-Driven Architecture**: Uses Mautic's event system for seamless integration
-- **Responsive Design**: Mobile-friendly interface for both admin and public views
-- **Security**: Proper permission controls and secure public access
-
-## Installation
+The installation script will:
+- ✅ Auto-detect your table prefix
+- ✅ Create required database tables
+- ✅ Insert default configuration
+- ✅ Verify installation
+- ✅ Work with any Mautic installation type
 
 ### Manual Installation
 
-1. **Download/Clone the Plugin**
+If you prefer manual installation:
+
+1. **Copy the plugin** to your Mautic installation:
    ```bash
-   cd /path/to/mautic/plugins/
-   git clone [repository-url] MauticEmailThreadsBundle
+   cp -r MauticEmailThreadsBundle /path/to/mautic/plugins/
    ```
 
-2. **Set Permissions**
+2. **Run the PHP installation script**:
    ```bash
-   chmod -R 755 MauticEmailThreadsBundle/
-   chown -R www-data:www-data MauticEmailThreadsBundle/
+   cd /path/to/mautic/plugins/MauticEmailThreadsBundle
+   php install_mautic6.php
    ```
 
-3. **Clear Cache**
+3. **Clear Mautic cache**:
    ```bash
-   php app/console cache:clear --env=prod
+   php /var/www/html/bin/console cache:clear
    ```
 
-4. **Install Plugin Database Tables**
-   - Go to Mautic Admin → Settings → Plugins
-   - Find "Email Threads" in the plugin list
-   - Click "Install/Upgrade" to create the database tables
+## 🎯 How It Works
 
-## Configuration
+The plugin works automatically in the background:
 
-### Plugin Settings
+1. **Email Sending**: When Mautic sends an email, the plugin intercepts the process
+2. **Thread Detection**: It checks if there are previous messages for the same contact
+3. **Content Injection**: If previous messages exist, it adds them as collapsible quotes
+4. **Email Delivery**: The email is sent with the threading content included
 
-Navigate to **Settings → Plugins → Email Threads** to configure:
+**No configuration needed** - it works out of the box with all email types!
 
-- **Enable Email Threads**: Toggle plugin functionality on/off
-- **Public Domain**: Set custom domain for public thread URLs
-- **Auto-create Threads**: Automatically create threads for all emails
-- **Thread Lifetime**: Set how long threads remain active (default: 30 days)
-- **Include Unsubscribe**: Add unsubscribe links to thread views
+## 📁 Plugin Structure
 
-### Database Tables
+```
+MauticEmailThreadsBundle/
+├── Config/                 # Plugin configuration
+├── Controller/             # Public thread controllers
+├── Entity/                 # Database entities
+├── EventListener/          # Email event subscribers
+├── Model/                  # Business logic models
+├── Translation/            # Internationalization
+├── Views/                  # Twig templates
+├── install_mautic6.php     # Installation script
+├── install.sh              # Shell installation script
+├── test_installation.php   # Installation test script
+└── README.md               # This file
+```
+
+## 🔧 Configuration
+
+The plugin works with default settings, but you can customize behavior by modifying the configuration in `Config/config.php`:
+
+```php
+'parameters' => [
+    'emailthreads_enabled' => true,
+    'emailthreads_domain' => '',
+    'emailthreads_auto_thread' => true,
+    'emailthreads_thread_lifetime' => 30, // days
+    'emailthreads_include_unsubscribe' => true,
+    'emailthreads_inject_previous_messages' => true,
+],
+```
+
+## 🗄️ Database Tables
 
 The plugin creates two main tables:
 
-#### `email_threads`
+### `{prefix}EmailThread`
 - Stores thread metadata and aggregated information
 - Links to Mautic leads
 - Tracks thread status and statistics
 
-#### `email_thread_messages`
+### `{prefix}EmailThreadMessage`
 - Stores individual email messages within threads
 - Links to original Mautic emails and statistics
 - Preserves email content and metadata
 
-## Usage
+*Note: `{prefix}` is automatically detected from your Mautic installation (e.g., `mt_`, `mautic_`, or no prefix)*
 
-### For Administrators
+## 🌐 Public Thread Views
 
-1. **View All Threads**
-   - Navigate to **Channels → Email Threads**
-   - Browse all active conversation threads
-   - Filter by status, contact, or date range
+The plugin provides public URLs for viewing email threads:
 
-2. **Thread Details**
-   - Click any thread to view complete message history
-   - See sender information, timestamps, and email types
-   - Access public URLs and embed codes
+- **Public View**: `/email-thread/{threadId}` - Full thread view
+- **Embed View**: `/email-thread/{threadId}/embed` - Embeddable version
 
-3. **Configuration Management**
-   - Adjust plugin settings as needed
-   - Run maintenance cleanup for old threads
-   - Monitor thread statistics and performance
-
-### For Recipients
-
-1. **Public Thread Access**
-   - Recipients receive emails with thread links
-   - Click links to view complete conversation history
-   - Clean, responsive interface for easy reading
-
-2. **Thread Features**
-   - Chronological message display
-   - Sender identification
-   - Message type indicators (template, campaign, broadcast)
-   - Mobile-friendly responsive design
-
-## API Endpoints
-
-### Public Endpoints
-- `GET /email-thread/{threadId}` - Public thread view
-- `GET /email-thread/{threadId}/embed` - Embeddable thread view
-
-### Admin Endpoints
-- `GET /s/emailthreads` - Thread management interface
-- `GET /s/emailthreads/view/{id}` - Thread details
-- `POST /s/emailthreads/config` - Configuration management
-- `POST /s/emailthreads/cleanup` - Maintenance operations
-
-## Technical Architecture
-
-### Event Integration
-
-The plugin integrates with Mautic's email system through event listeners:
-
-- **EmailEvents::EMAIL_ON_SEND**: Modifies email content to include thread links
-- **EmailEvents::EMAIL_POST_SEND**: Creates/updates thread records after sending
-
-### Models
-
-- **EmailThreadModel**: Manages thread entities and business logic
-- **EmailThreadMessageModel**: Handles individual message operations
-
-### Controllers
-
-- **DefaultController**: Admin interface and configuration
-- **PublicController**: Public-facing thread views
-
-### Security
-
-- **Permission System**: Integrates with Mautic's permission framework
-- **Public Access Control**: Secure thread access without authentication
-- **XSS Protection**: Proper content sanitization and escaping
-
-## Customization
-
-### Styling
-
-The plugin includes comprehensive CSS that can be customized:
-
-```css
-/* Custom thread styling */
-.emailthreads-container {
-    /* Your custom styles */
-}
-```
-
-### Templates
-
-Override default templates by copying to your theme:
-
-```
-themes/your-theme/html/MauticEmailThreadsBundle/
-├── Default/
-│   ├── index.html.php
-│   └── view.html.php
-└── Public/
-    ├── thread.html.php
-    └── thread_embed.html.php
-```
-
-### JavaScript
-
-Extend functionality with custom JavaScript:
-
-```javascript
-// Access plugin functionality
-EmailThreads.config.refreshInterval = 60000; // Custom refresh interval
-EmailThreads.loadThreads(true); // Force refresh
-```
-
-## Troubleshooting
+## 🐛 Troubleshooting
 
 ### Common Issues
 
-1. **Threads Not Creating**
-   - Verify plugin is enabled in configuration
-   - Check that emails are being sent successfully
-   - Ensure database tables were created during installation
+1. **Plugin not working after installation**
+   ```bash
+   # Clear cache
+   php /var/www/html/bin/console cache:clear
+   
+   # Check if tables exist
+   php test_installation.php
+   ```
 
-2. **Public Links Not Working**
-   - Verify public domain configuration
-   - Check web server URL rewriting rules
-   - Ensure proper file permissions
+2. **Database connection errors**
+   - Verify database credentials in your Mautic configuration
+   - Ensure the database user has CREATE and INSERT permissions
 
-3. **Database Errors**
-   - Run `php app/console cache:clear`
-   - Check database table creation
-   - Verify database user permissions
+3. **Previous messages not showing**
+   - Check Mautic error logs: `tail -f /var/www/html/var/logs/prod.log`
+   - Verify the plugin is enabled in configuration
 
 ### Debug Mode
 
-Enable debug logging by adding to your local.php:
-
-```php
-'emailthreads_debug' => true,
-```
-
-### Performance Optimization
-
-For high-volume installations:
-
-1. **Database Indexing**: Ensure proper indexes on thread and message tables
-2. **Cache Strategy**: Consider implementing thread caching
-3. **Cleanup Schedule**: Set up regular cleanup of old threads
-
-## Development
-
-### File Structure
-
-```
-MauticEmailThreadsBundle/
-├── Assets/                 # CSS, JS, and other assets
-├── Config/                 # Plugin configuration
-├── Controller/             # Controllers for admin and public interfaces
-├── Entity/                 # Database entities and repositories
-├── EventListener/          # Event subscribers for Mautic integration
-├── Form/                   # Form types for configuration
-├── Model/                  # Business logic models
-├── Translation/            # Internationalization files
-├── Views/                  # Template files
-└── MauticEmailThreadsBundle.php # Main plugin class
-```
-
-### Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-### Testing
-
+Enable debug logging by checking the Mautic error logs:
 ```bash
-# Run plugin tests
-php app/console mautic:plugins:test MauticEmailThreadsBundle
+tail -f /var/www/html/var/logs/prod.log | grep EmailThreads
 ```
 
-## License
+## 🔄 Updates
 
-This plugin is released under the same license as Mautic (GPL v3).
+To update the plugin:
 
-## Support
+1. **Backup your data** (optional but recommended)
+2. **Replace plugin files** with the new version
+3. **Run installation script** (it's idempotent - safe to run multiple times):
+   ```bash
+   ./install.sh
+   ```
+4. **Clear cache**:
+   ```bash
+   php /var/www/html/bin/console cache:clear
+   ```
+
+## 📝 License
+
+This plugin is released under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## 🤝 Support
 
 For support and questions:
 
-1. Check the documentation above
-2. Search existing issues in the repository
-3. Create a new issue with detailed information
-4. Contact the maintainers
+1. Check the troubleshooting section above
+2. Review the installation logs
+3. Check Mautic error logs for specific error messages
+4. Contact: arc.mahir@gmail.com
 
-## Changelog
+## 📈 Changelog
 
 ### Version 1.0.0
-- Initial release
-- Core threading functionality
-- Admin interface
-- Public thread views
-- Configuration management
-- Embeddable threads
-- Multi-language support
+- Initial release for Mautic 6.0.3+
+- Automatic email threading functionality
+- Gmail/Outlook style collapsible messages
+- Public thread views and embed support
+- Auto-detection of table prefixes
+- Idempotent installation process
+- Non-blocking error handling
 
 ---
 
-**Note**: This plugin is designed for Mautic 4.x and later. For earlier versions, compatibility updates may be required.
+**Note**: This plugin is designed for Mautic 6.0.3 and later. For earlier versions, compatibility updates may be required.
