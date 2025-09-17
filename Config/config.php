@@ -32,6 +32,11 @@ return [
                 'arguments' => ['doctrine.orm.entity_manager'],
                 'tags' => ['kernel.event_subscriber'],
             ],
+            'mautic.emailthreads.subscriber.install' => [
+                'class'     => \MauticPlugin\MauticEmailThreadsBundle\EventListener\InstallSubscriber::class,
+                'arguments' => ['doctrine.orm.entity_manager'],
+                'tags' => ['kernel.event_subscriber'],
+            ],
         ],
         'models' => [
             'mautic.emailthreads.model.thread' => [

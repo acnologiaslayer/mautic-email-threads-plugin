@@ -63,7 +63,7 @@ function detectTablePrefix($pdo) {
  * Check if plugin is already installed
  */
 function isPluginInstalled($pdo, $prefix) {
-    $emailThreadTable = $prefix . 'EmailThread';
+    $emailThreadTable = $prefix . 'email_threads';
     $stmt = $pdo->query("SHOW TABLES LIKE '$emailThreadTable'");
     return $stmt->rowCount() > 0;
 }
@@ -122,7 +122,7 @@ try {
     }
     
     // Create EmailThread table
-    $emailThreadTable = $prefix . 'EmailThread';
+    $emailThreadTable = $prefix . 'email_threads';
     echo "Creating $emailThreadTable table...\n";
     $createEmailThreadTable = "
         CREATE TABLE IF NOT EXISTS `$emailThreadTable` (
@@ -156,7 +156,7 @@ try {
     echo "✓ Created $emailThreadTable table\n";
     
     // Create EmailThreadMessage table
-    $emailThreadMessageTable = $prefix . 'EmailThreadMessage';
+    $emailThreadMessageTable = $prefix . 'email_thread_messages';
     echo "Creating $emailThreadMessageTable table...\n";
     $createEmailThreadMessageTable = "
         CREATE TABLE IF NOT EXISTS `$emailThreadMessageTable` (

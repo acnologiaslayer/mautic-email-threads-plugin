@@ -11,7 +11,7 @@ use Mautic\EmailBundle\Entity\Email;
 use Mautic\EmailBundle\Entity\Stat;
 
 #[ORM\Entity]
-#[ORM\Table(name: 'mt_EmailThreadMessage')]
+#[ORM\Table(name: 'email_thread_messages')]
 #[ORM\Index(columns: ['thread_id'], name: 'message_thread_idx')]
 #[ORM\Index(columns: ['email_stat_id'], name: 'message_stat_idx')]
 #[ORM\Index(columns: ['date_sent'], name: 'message_date_sent_idx')]

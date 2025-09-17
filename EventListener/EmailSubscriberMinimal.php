@@ -178,8 +178,8 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             
             // Detect table prefix
             $prefix = $this->detectTablePrefix($pdo);
-            $emailThreadTable = $prefix . 'EmailThread';
-            $emailThreadMessageTable = $prefix . 'EmailThreadMessage';
+            $emailThreadTable = $prefix . 'email_threads';
+            $emailThreadMessageTable = $prefix . 'email_thread_messages';
             
             error_log('EmailThreads: getPreviousMessages - Looking for messages for lead: ' . $leadId . ', subject: ' . $subject . ', using prefix: ' . $prefix);
             
@@ -434,8 +434,8 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             
             // Detect table prefix
             $prefix = $this->detectTablePrefix($pdo);
-            $emailThreadTable = $prefix . 'EmailThread';
-            $emailThreadMessageTable = $prefix . 'EmailThreadMessage';
+            $emailThreadTable = $prefix . 'email_threads';
+            $emailThreadMessageTable = $prefix . 'email_thread_messages';
             
             // Generate thread ID
             $threadId = 'thread_' . $leadId . '_' . md5($subject . $leadId);

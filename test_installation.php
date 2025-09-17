@@ -58,8 +58,8 @@ try {
     echo "✓ Detected table prefix: '" . ($prefix ?: 'none') . "'\n";
     
     // Check if plugin tables exist
-    $emailThreadTable = $prefix . 'EmailThread';
-    $emailThreadMessageTable = $prefix . 'EmailThreadMessage';
+    $emailThreadTable = $prefix . 'email_threads';
+    $emailThreadMessageTable = $prefix . 'email_thread_messages';
     $configTable = $prefix . 'config';
     
     $tables = [$emailThreadTable, $emailThreadMessageTable, $configTable];
