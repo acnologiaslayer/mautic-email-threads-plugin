@@ -115,7 +115,7 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
                 $leadName = $leadData['email'] ?? 'Unknown';
             }
             
-            // Try to find previous messages for this lead
+            // Try to find previous messages for this lead matching this email's subject thread
             $previousMessages = $this->getPreviousMessages((int) $leadId, $email->getSubject());
             
             if (empty($previousMessages)) {
@@ -181,7 +181,11 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             $emailThreadTable = $prefix . 'email_threads';
             $emailThreadMessageTable = $prefix . 'email_thread_messages';
             
-            error_log('EmailThreads: getPreviousMessages - Looking for messages for lead: ' . $leadId . ', subject: ' . $subject . ', using prefix: ' . $prefix);
+            // Normalize subject and compute thread key used when saving
+            $normalizedSubject = $this->normalizeSubject($subject);
+            $threadKey = 'thread_' . $leadId . '_' . md5($normalizedSubject . $leadId);
+
+            error_log('EmailThreads: getPreviousMessages - Looking for messages for lead: ' . $leadId . ', subject: ' . $subject . ' (normalized: ' . $normalizedSubject . '), using prefix: ' . $prefix);
             
             // First, let's check if there are any threads for this lead at all
             $checkSql = "SELECT COUNT(*) as count FROM $emailThreadTable WHERE lead_id = ?";
@@ -197,12 +201,13 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             $messageCount = $stmt->fetchColumn();
             error_log('EmailThreads: getPreviousMessages - Found ' . $messageCount . ' messages for lead: ' . $leadId);
             
-            // Find previous messages for this lead with similar subject
+            // Find previous messages for this lead in the same thread (by normalized subject)
             $sql = "
                 SELECT etm.*, et.thread_id, et.from_email, et.from_name
                 FROM $emailThreadMessageTable etm
                 JOIN $emailThreadTable et ON etm.thread_id = et.id
                 WHERE et.lead_id = ? 
+                AND et.thread_id = ?
                 AND et.is_active = 1
                 AND etm.date_sent < NOW()
                 ORDER BY etm.date_sent DESC
@@ -211,7 +216,7 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             error_log('EmailThreads: getPreviousMessages - Executing SQL: ' . $sql . ' with leadId: ' . $leadId);
             
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([$leadId]);
+            $stmt->execute([$leadId, $threadKey]);
             $messages = $stmt->fetchAll();
             
             error_log('EmailThreads: getPreviousMessages - Found ' . count($messages) . ' previous messages for lead: ' . $leadId);
@@ -394,11 +399,20 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
         return $truncated;
     }
     
-    private function cleanSubject(string $subject): string
+    private function normalizeSubject(string $subject): string
     {
-        // Remove common reply prefixes
-        $subject = preg_replace('/^(Re:|RE:|Fwd:|FWD:)\s*/i', '', $subject);
-        return trim($subject);
+        // Remove common reply/forward prefixes repeatedly, trim whitespace, collapse spaces, lower-case for stable hashing
+        $normalized = trim($subject);
+        // Strip all known prefixes repeatedly
+        while (preg_match('/^(re|fw|fwd)\s*[:\-]\s*/i', $normalized)) {
+            $normalized = preg_replace('/^(re|fw|fwd)\s*[:\-]\s*/i', '', $normalized);
+            $normalized = trim($normalized);
+        }
+        // Collapse internal whitespace
+        $normalized = preg_replace('/\s+/', ' ', $normalized);
+        // Lowercase for consistent thread ids
+        $normalized = mb_strtolower($normalized);
+        return $normalized;
     }
     
     private function saveEmailToDatabase(EmailSendEvent $event): void
@@ -437,8 +451,9 @@ class EmailSubscriberMinimal implements EventSubscriberInterface
             $emailThreadTable = $prefix . 'email_threads';
             $emailThreadMessageTable = $prefix . 'email_thread_messages';
             
-            // Generate thread ID
-            $threadId = 'thread_' . $leadId . '_' . md5($subject . $leadId);
+            // Generate thread ID using normalized subject so threads are separated by topic
+            $normalizedSubject = $this->normalizeSubject($subject);
+            $threadId = 'thread_' . $leadId . '_' . md5($normalizedSubject . $leadId);
             
             // Check if thread exists
             $checkThreadSql = "SELECT id FROM $emailThreadTable WHERE thread_id = ? AND lead_id = ?";
